@@ -57,7 +57,7 @@ def test_access_denied_for_invalid_role(client: TestClient, artifact_fixture: st
         json={"mode": "signed_url"},
     )
     assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden_role"
+    assert response.json()["error"]["message"] == "forbidden_role"
 
 
 def test_access_denied_for_wrong_org(client: TestClient, artifact_fixture: str):
@@ -71,7 +71,7 @@ def test_access_denied_for_wrong_org(client: TestClient, artifact_fixture: str):
         json={"mode": "signed_url"},
     )
     assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden_org"
+    assert response.json()["error"]["message"] == "forbidden_org"
 
 
 def test_signed_url_and_download(client: TestClient, artifact_fixture: str):

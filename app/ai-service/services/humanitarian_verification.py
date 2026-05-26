@@ -67,6 +67,12 @@ class HumanitarianVerificationService:
             errors: List[str] = []
 
             for provider in providers:
+                breaker = self.breakers.get(provider)
+                if breaker and not breaker.allow_request():
+                    logger.warning("Circuit breaker is OPEN for provider=%s. Skipping.", provider)
+                    errors.append(f"provider={provider}, error=Circuit breaker is OPEN")
+                    continue
+
                 model = self._get_model_for_provider(provider)
                 for prompt_variant, prompt in (("primary", primary_prompt), ("fallback", fallback_prompt)):
                     try:
@@ -84,6 +90,8 @@ class HumanitarianVerificationService:
                             timeout=timeout,
                         )
                         parsed = self._parse_json_response(raw_content)
+                        if breaker:
+                            breaker.record_success()
                         return {
                             "provider": provider,
                             "model": model,
@@ -92,6 +100,8 @@ class HumanitarianVerificationService:
                             "raw_response": raw_content,
                         }
                     except Exception as exc:
+                        if breaker:
+                            breaker.record_failure()
                         err = f"provider={provider}, model={model}, prompt={prompt_variant}, error={exc}"
                         errors.append(err)
                         logger.warning("Humanitarian verification attempt failed: %s", err)
@@ -142,10 +152,15 @@ class HumanitarianVerificationService:
             return self._call_groq(model, system_prompt, user_prompt, timeout)
         raise ValueError(f"Unsupported provider: {provider}")
 
-    def _call_openai(self, model: str, system_prompt: str, user_prompt: str, timeout: Optional[float] = None) -> str:
+    def _call_openai(
+        self,
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+        timeout: Optional[float] = None,
+    ) -> str:
         if not settings.openai_api_key:
             raise RuntimeError("OpenAI API key is not configured")
-
         return self._call_chat_completion_api(
             base_url="https://api.openai.com/v1/chat/completions",
             api_key=settings.openai_api_key,
@@ -155,10 +170,15 @@ class HumanitarianVerificationService:
             timeout=timeout,
         )
 
-    def _call_groq(self, model: str, system_prompt: str, user_prompt: str, timeout: Optional[float] = None) -> str:
+    def _call_groq(
+        self,
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+        timeout: Optional[float] = None,
+    ) -> str:
         if not settings.groq_api_key:
             raise RuntimeError("Groq API key is not configured")
-
         return self._call_chat_completion_api(
             base_url="https://api.groq.com/openai/v1/chat/completions",
             api_key=settings.groq_api_key,
@@ -189,18 +209,40 @@ class HumanitarianVerificationService:
                 {"role": "user", "content": user_prompt},
             ],
         }
-
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
 
-        effective_timeout = timeout if timeout is not None else float(settings.llm_timeout_seconds)
+        req_timeout = timeout if timeout is not None else float(settings.llm_timeout_seconds)
+        provider_name = "openai" if "openai" in base_url else "groq"
 
-        with httpx.Client(timeout=effective_timeout) as client:
-            response = client.post(base_url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            with httpx.Client(timeout=req_timeout) as client:
+                response = client.post(base_url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.TimeoutException as exc:
+            logger.error("LLM provider %s request timed out after %s seconds", provider_name, req_timeout)
+            raise AIServiceError(
+                message=f"LLM request timed out after {req_timeout}s",
+                code="AI_TIMEOUT",
+                details={"provider": provider_name, "timeout_seconds": req_timeout},
+            ) from exc
+        except httpx.HTTPStatusError as exc:
+            logger.error("LLM provider %s returned status %s: %s", provider_name, exc.response.status_code, exc.response.text)
+            raise AIServiceError(
+                message=f"LLM request failed with status {exc.response.status_code}",
+                code="AI_PROVIDER_ERROR",
+                details={"provider": provider_name, "status_code": exc.response.status_code},
+            ) from exc
+        except Exception as exc:
+            logger.error("LLM provider %s connection or unexpected error: %s", provider_name, str(exc))
+            raise AIServiceError(
+                message=f"LLM connection error: {str(exc)}",
+                code="AI_CONNECTION_ERROR",
+                details={"provider": provider_name},
+            ) from exc
 
         try:
             content = data["choices"][0]["message"]["content"]
@@ -232,12 +274,10 @@ class HumanitarianVerificationService:
 
     def _parse_json_response(self, content: str) -> Dict[str, Any]:
         normalized = content.strip()
-
         if normalized.startswith("```"):
             normalized = normalized.strip("`")
             if normalized.startswith("json"):
                 normalized = normalized[4:].strip()
-
         parsed = json.loads(normalized)
         if not isinstance(parsed, dict):
             raise RuntimeError("LLM response must be a JSON object")

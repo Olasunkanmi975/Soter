@@ -55,10 +55,14 @@ def detect_fraud(claims: List[ClaimMetadata]) -> List[ClaimFraudResult]:
         return [ClaimFraudResult(claim_id=claims[0].claim_id, fraud_risk_score=0.0, is_flagged=False)]
 
     X = _vectorize(claims)
+    
+    # Add tiny random noise to prevent identical point degeneracy and zero-distance division issues
+    np.random.seed(42)
+    X_noise = X + np.random.normal(0, 1e-5, X.shape)
 
-    n_neighbors = min(20, len(claims) - 1)
+    n_neighbors = min(20, max(2, len(claims) // 2))
     lof = LocalOutlierFactor(n_neighbors=n_neighbors, contamination="auto")
-    lof.fit_predict(X)
+    lof.fit_predict(X_noise)
     raw_scores: np.ndarray = lof.negative_outlier_factor_  # negative; more negative = more anomalous
 
     # Normalise to [0, 1]: most anomalous → 1, most normal → 0

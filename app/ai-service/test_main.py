@@ -66,7 +66,7 @@ def test_openapi_schema(client):
     
     assert data["openapi"] == "3.1.0" or data["openapi"].startswith("3.")
     assert data["info"]["title"] == "Soter AI Service"
-    assert data["info"]["version"] == "0.1.0"
+    assert data["info"]["version"] == "1.0.0"
 
 
 def test_error_handling_404(client):
@@ -131,7 +131,7 @@ def test_proof_of_life_invalid_image(client, monkeypatch):
     )
     assert response.status_code == 422
     body = response.json()
-    assert body["detail"] == "Invalid base64 image payload"
+    assert body["error"]["message"] == "Invalid base64 image payload"
 
 
 def test_proof_of_life_threshold_validation(client):

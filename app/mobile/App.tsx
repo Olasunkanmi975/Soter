@@ -1,10 +1,16 @@
 import React, { useEffect, useRef } from 'react';
 import * as ExpoLinking from 'expo-linking';
-import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  NavigationContainerRef,
+} from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './src/navigation/AppNavigator';
-import { RootStackParamList, deepLinkToNavParams } from './src/navigation/types';
+import {
+  RootStackParamList,
+  deepLinkToNavParams,
+} from './src/navigation/types';
 import { WalletProvider } from './src/contexts/WalletContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { BiometricProvider } from './src/contexts/BiometricContext';
@@ -45,7 +51,8 @@ const linking = {
 const AppInner = () => {
   const { navTheme, scheme } = useTheme();
   const { pendingDeepLink, consumeDeepLink } = useNotification();
-  const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+  const navigationRef =
+    useRef<NavigationContainerRef<RootStackParamList>>(null);
   const { isForceUpgrade, isLoading } = useUpdate();
 
   // -----------------------------------------------------------------------
@@ -60,17 +67,31 @@ const AppInner = () => {
       return;
     }
 
-    const timer = setTimeout(() => {
-      if (navigationRef.current) {
+    let active = true;
+    let retryTimer: NodeJS.Timeout | null = null;
+
+    const attemptNavigate = () => {
+      if (!active) return;
+      if (navigationRef.current?.isReady?.()) {
         navigationRef.current.navigate(
           navParams.screen as any,
           navParams.params as any,
         );
+        consumeDeepLink();
+        return;
       }
-      consumeDeepLink();
-    }, 300);
 
-    return () => clearTimeout(timer);
+      retryTimer = setTimeout(attemptNavigate, 100);
+    };
+
+    attemptNavigate();
+
+    return () => {
+      active = false;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
+    };
   }, [pendingDeepLink, consumeDeepLink]);
 
   if (isLoading) {

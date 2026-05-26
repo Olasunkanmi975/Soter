@@ -262,7 +262,7 @@ class TestProofOfLifeV1:
             json={"selfie_image_base64": "bad"},
         )
         assert response.status_code == 422
-        assert response.json()["detail"] == "bad image"
+        assert response.json()["error"]["message"] == "bad image"
 
     def test_v1_proof_of_life_threshold_out_of_range(self, following_client):
         response = following_client.post(

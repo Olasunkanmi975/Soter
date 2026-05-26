@@ -26,12 +26,24 @@ async def verify_humanitarian_claim(request: HumanitarianVerificationRequest):
     logger.info("Processing humanitarian verification request")
 
     try:
-        result = _main.humanitarian_verification_service.verify_claim(
-            aid_claim=request.aid_claim,
-            supporting_evidence=request.supporting_evidence,
-            context_factors=request.context_factors,
-            provider_preference=request.provider_preference,
-        )
+        try:
+            result = _main.humanitarian_verification_service.verify_claim(
+                aid_claim=request.aid_claim,
+                supporting_evidence=request.supporting_evidence,
+                context_factors=request.context_factors,
+                provider_preference=request.provider_preference,
+                timeout=request.timeout,
+            )
+        except TypeError as exc:
+            if "timeout" in str(exc):
+                result = _main.humanitarian_verification_service.verify_claim(
+                    aid_claim=request.aid_claim,
+                    supporting_evidence=request.supporting_evidence,
+                    context_factors=request.context_factors,
+                    provider_preference=request.provider_preference,
+                )
+            else:
+                raise exc
         return HumanitarianVerificationResponse(success=True, **result)
     except Exception as e:
         logger.error("Humanitarian verification failed: %s", str(e), exc_info=True)

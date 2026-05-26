@@ -5,8 +5,14 @@ import sys
 from unittest.mock import MagicMock, patch
 
 
+class StubMock(MagicMock):
+    @property
+    def __spec__(self):
+        return None
+
+
 def _make_pkg(name: str):
-    mod = MagicMock()
+    mod = StubMock()
     mod.__path__ = []
     mod.__package__ = name
     return mod
@@ -21,12 +27,22 @@ _PKG_STUBS = [
     "spacy", "spacy.language", "spacy.tokens", "spacy.tokens.doc",
     "openai", "openai.types", "openai.types.chat",
     "groq", "anthropic",
-    "transformers", "torch", "tensorflow", "numpy",
+    "numpy",
 ]
 
+import importlib.util
+
 for _mod in _PKG_STUBS:
-    if _mod not in sys.modules:
-        sys.modules[_mod] = _make_pkg(_mod)
+    root = _mod.split('.')[0]
+    try:
+        spec = importlib.util.find_spec(root)
+        has_pkg = spec is not None
+    except Exception:
+        has_pkg = False
+        
+    if not has_pkg:
+        if _mod not in sys.modules:
+            sys.modules[_mod] = _make_pkg(_mod)
 
 # proof_of_life raises RuntimeError at import time when cv2 is mocked.
 _pol = _make_pkg("proof_of_life")

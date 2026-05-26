@@ -116,4 +116,42 @@ describe('Evidence Queue (e2e)', () => {
     // Verify file is gone
     await expect(fs.access(filePath)).rejects.toThrow();
   });
+
+  it('POST /evidence/upload rejects invalid MIME type', async () => {
+    const fileContent = Buffer.from('fake image content');
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, { filename: 'test.exe', contentType: 'application/x-msdownload' })
+      .expect(400);
+
+    expect(res.body.message).toContain('Invalid MIME type');
+  });
+
+  it('POST /evidence/upload rejects oversized files', async () => {
+    const largeFile = Buffer.alloc(11 * 1024 * 1024, 'a');
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', largeFile, { filename: 'big.txt', contentType: 'text/plain' })
+      .expect(400);
+
+    expect(res.body.message).toContain('File too large');
+  });
+
+  it('POST /evidence/upload stores correct hash for integrity', async () => {
+    const fileContent = Buffer.from('hash check content');
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/evidence/upload')
+      .attach('file', fileContent, { filename: 'hash-test.txt', contentType: 'text/plain' })
+      .expect(201);
+
+    const item = await prisma.evidenceQueueItem.findUnique({
+      where: { id: res.body.id },
+    });
+
+    expect(item?.fileHash).toBeDefined();
+    expect(item?.fileHash).toHaveLength(64);
+  });
 });

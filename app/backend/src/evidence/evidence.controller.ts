@@ -9,6 +9,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { Request as ExpressRequest } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -24,6 +25,15 @@ import {
 import { EvidenceService } from './evidence.service';
 import { Roles } from '../auth/roles.decorator';
 import { AppRole } from '../auth/app-role.enum';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'application/pdf',
+  'text/plain',
+];
 
 @ApiTags('Evidence Queue')
 @ApiBearerAuth('JWT-auth')
@@ -55,6 +65,22 @@ export class EvidenceController {
     @UploadedFile() file: Express.Multer.File,
     @Request() req: ExpressRequest,
   ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Invalid MIME type: ${file.mimetype}. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`,
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      throw new BadRequestException(
+        `File too large. Maximum allowed size is ${MAX_FILE_SIZE / (1024 * 1024)}MB`,
+      );
+    }
+
     const ownerId = req.user?.apiKeyId || req.user?.authType || 'system';
     return this.evidenceService.queueEvidence(file, ownerId);
   }
