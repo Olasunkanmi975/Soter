@@ -3,9 +3,9 @@ Configuration module for Soter AI Service
 Handles environment variables and API key management
 """
 
-from pydantic import Literal, model_validator
+from typing import Literal, Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 import logging
 import os
 import secrets
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         AI_DETERMINISTIC_MODE: Enable deterministic AI results for verification and classification during tests/CI
         TEST_PROVIDER_MODE: Enable test provider mode that returns fixture-driven results (no API keys required)
         LLM_TIMEOUT_SECONDS: Timeout for LLM API requests
-        APP_ENV: Application environment (development, staging, production)
+        APP_ENV: Application environment (development, staging, production, test)
         LOG_LEVEL: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         HOST: Server host (default: 0.0.0.0)
         PORT: Server port (default: 8000)
