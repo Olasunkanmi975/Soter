@@ -5,7 +5,7 @@ export default function HelpPage() {
   const role = getAppUserRole();
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background to-slate-50 px-4 py-10 dark:to-slate-950">
+    <main className="min-h-screen bg-linear-to-b from-background to-slate-50 px-4 py-10 dark:to-slate-950">
       <div className="mx-auto max-w-5xl space-y-8">
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
