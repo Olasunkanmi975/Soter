@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OnchainAdapter, ONCHAIN_ADAPTER_TOKEN } from './onchain.adapter';
 import {
   CreateAidPackageDto,
@@ -11,6 +12,7 @@ import {
 } from './dto/aid-escrow.dto';
 import { BudgetService } from '../common/budget/budget.service';
 import { GetTransactionStatusResult } from './onchain.adapter';
+import { explorerTxUrl, explorerContractUrl } from '../common/utils/explorer-url.util';
 
 /**
  * AidEscrowService
@@ -20,12 +22,21 @@ import { GetTransactionStatusResult } from './onchain.adapter';
 @Injectable()
 export class AidEscrowService {
   private readonly logger = new Logger(AidEscrowService.name);
+  private readonly network: string;
 
   constructor(
     @Inject(ONCHAIN_ADAPTER_TOKEN)
     private readonly onchainAdapter: OnchainAdapter,
     private readonly budgetService: BudgetService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.network = this.configService.get<string>('SOROBAN_NETWORK', 'testnet');
+  }
+
+  private withTxExplorerUrl<T extends { transactionHash?: string }>(result: T): T & { explorerUrl?: string } {
+    if (!result.transactionHash) return result;
+    return { ...result, explorerUrl: explorerTxUrl(result.transactionHash, this.network) };
+  }
 
   /**
    * Check token balance before creating packages
@@ -115,7 +126,7 @@ export class AidEscrowService {
       tokenAddress: dto.tokenAddress,
     });
 
-    return result;
+    return this.withTxExplorerUrl(result);
   }
 
   /**
@@ -171,7 +182,7 @@ export class AidEscrowService {
       tokenAddress: dto.tokenAddress,
     });
 
-    return result;
+    return this.withTxExplorerUrl(result);
   }
 
   /**
@@ -193,7 +204,7 @@ export class AidEscrowService {
       amountClaimed: result.amountClaimed,
     });
 
-    return result;
+    return this.withTxExplorerUrl(result);
   }
 
   /**
@@ -218,7 +229,7 @@ export class AidEscrowService {
       amountDisbursed: result.amountDisbursed,
     });
 
-    return result;
+    return this.withTxExplorerUrl(result);
   }
 
   /**
@@ -275,6 +286,6 @@ export class AidEscrowService {
       status: result.status,
     });
 
-    return result;
+    return { ...result, explorerUrl: explorerTxUrl(result.hash, this.network) };
   }
 }
