@@ -6,7 +6,7 @@ export class AdminSearchService {
   constructor(private readonly prisma: PrismaService) {}
 
   async search(query: string, entity: string | undefined, orgId: string) {
-    const results: any[] = [];
+    const results: Array<{ type: string; label: string; status: string; id: string }> = [];
     const q = query.toLowerCase();
 
     // 1. Search Campaigns

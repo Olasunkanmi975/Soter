@@ -78,7 +78,7 @@ export class SeedService {
             region: DEMO_TENANT_SEED.region,
             isTenantMarker: true,
           }),
-        ),
+        ) as Record<string, unknown>,
       },
     });
 
@@ -109,7 +109,7 @@ export class SeedService {
             status: seed.status,
             budget: seed.budget,
             ngoId: DEMO_TENANT_SEED.ngoId,
-            metadata: JSON.parse(JSON.stringify(seed.metadata)),
+            metadata: JSON.parse(JSON.stringify(seed.metadata)) as Record<string, unknown>,
           },
         });
         created++;
