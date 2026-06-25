@@ -130,15 +130,19 @@ describe('CacheResponseInterceptor', () => {
 
       jest.spyOn(reflector, 'get').mockReturnValue(cacheOptions);
       jest.spyOn(redisService, 'get').mockResolvedValue(null);
+      jest.spyOn(redisService, 'set').mockResolvedValue(undefined);
 
       interceptor
         .intercept(mockExecutionContext, mockCallHandler)
-        .subscribe(() => {
-          expect(cacheOptions.keyGenerator).toHaveBeenCalled();
-          expect(redisService.get).toHaveBeenCalledWith(
-            expect.stringContaining(customKey),
-          );
-          done();
+        .subscribe({
+          next: () => {
+            expect(cacheOptions.keyGenerator).toHaveBeenCalled();
+            expect(redisService.get).toHaveBeenCalledWith(
+              expect.stringContaining(customKey),
+            );
+            done();
+          },
+          error: (err) => done(err),
         });
     });
 
