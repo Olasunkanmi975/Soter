@@ -170,95 +170,104 @@ class TestCachedResponseDecorator:
     @pytest.mark.asyncio
     async def test_cached_response_async_function_cache_miss(self):
         """Test async function with cache miss"""
-        mock_func = Mock(return_value="result")
+        # Create a mock cache service directly
+        mock_cache = Mock()
+        mock_cache.enabled = True
+        mock_cache.get.return_value = None
+        mock_cache._generate_key = Mock(return_value="test_key")
 
-        # Mock the main module's app attribute
-        with patch("services.cache.main") as mock_main:
-            mock_app = Mock()
-            mock_cache = Mock()
-            mock_cache.enabled = True
-            mock_cache.get.return_value = None
+        call_count = 0
+
+        @cached_response(prefix="test", ttl_seconds=60)
+        async def test_func(cache_service, arg1):
+            nonlocal call_count
+            call_count += 1
+            return f"result_{arg1}"
+
+        # Temporarily inject cache into function's closure
+        with patch("main.app") as mock_app:
             mock_app.state.cache = mock_cache
-            mock_main.app = mock_app
+            result = await test_func(arg1="value1")
 
-            @cached_response(prefix="test", ttl_seconds=60)
-            async def test_func(arg1):
-                return mock_func(arg1)
-
-            result = await test_func("value1")
-
-            assert result == "result"
-            mock_cache.get.assert_called_once()
-            mock_cache.set.assert_called_once()
+        assert result == "result_value1"
+        assert call_count == 1
+        mock_cache.get.assert_called_once()
+        mock_cache.set.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_cached_response_async_function_cache_hit(self):
         """Test async function with cache hit"""
-        mock_func = Mock()
+        # Create a mock cache service directly
+        mock_cache = Mock()
+        mock_cache.enabled = True
+        mock_cache.get.return_value = "cached_result"
+        mock_cache._generate_key = Mock(return_value="test_key")
 
-        # Mock the main module's app attribute
-        with patch("services.cache.main") as mock_main:
-            mock_app = Mock()
-            mock_cache = Mock()
-            mock_cache.enabled = True
-            mock_cache.get.return_value = "cached_result"
+        call_count = 0
+
+        @cached_response(prefix="test", ttl_seconds=60)
+        async def test_func(arg1):
+            nonlocal call_count
+            call_count += 1
+            return f"result_{arg1}"
+
+        # Temporarily inject cache into function's closure
+        with patch("main.app") as mock_app:
             mock_app.state.cache = mock_cache
-            mock_main.app = mock_app
-
-            @cached_response(prefix="test", ttl_seconds=60)
-            async def test_func(arg1):
-                return mock_func(arg1)
-
             result = await test_func("value1")
 
-            assert result == "cached_result"
-            mock_cache.get.assert_called_once()
-            mock_cache.set.assert_not_called()
-            mock_func.assert_not_called()
+        assert result == "cached_result"
+        assert call_count == 0  # Function not called
+        mock_cache.get.assert_called_once()
+        mock_cache.set.assert_not_called()
 
     def test_cached_response_sync_function(self):
         """Test sync function caching"""
-        mock_func = Mock(return_value="result")
+        # Create a mock cache service directly
+        mock_cache = Mock()
+        mock_cache.enabled = True
+        mock_cache.get.return_value = None
+        mock_cache._generate_key = Mock(return_value="test_key")
 
-        # Mock the main module's app attribute
-        with patch("services.cache.main") as mock_main:
-            mock_app = Mock()
-            mock_cache = Mock()
-            mock_cache.enabled = True
-            mock_cache.get.return_value = None
+        call_count = 0
+
+        @cached_response(prefix="test", ttl_seconds=60)
+        def test_func(arg1):
+            nonlocal call_count
+            call_count += 1
+            return f"result_{arg1}"
+
+        # Temporarily inject cache into function's closure
+        with patch("main.app") as mock_app:
             mock_app.state.cache = mock_cache
-            mock_main.app = mock_app
-
-            @cached_response(prefix="test", ttl_seconds=60)
-            def test_func(arg1):
-                return mock_func(arg1)
-
             result = test_func("value1")
 
-            assert result == "result"
-            mock_cache.get.assert_called_once()
-            mock_cache.set.assert_called_once()
+        assert result == "result_value1"
+        assert call_count == 1
+        mock_cache.get.assert_called_once()
+        mock_cache.set.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_cached_response_cache_disabled(self):
         """Test that function executes normally when cache is disabled"""
-        mock_func = Mock(return_value="result")
+        # Create a mock cache service that's disabled
+        mock_cache = Mock()
+        mock_cache.enabled = False
 
-        # Mock the main module's app attribute with disabled cache
-        with patch("services.cache.main") as mock_main:
-            mock_app = Mock()
-            mock_cache = Mock()
-            mock_cache.enabled = False
+        call_count = 0
+
+        @cached_response(prefix="test", ttl_seconds=60)
+        async def test_func(arg1):
+            nonlocal call_count
+            call_count += 1
+            return f"result_{arg1}"
+
+        # Temporarily inject cache into function's closure
+        with patch("main.app") as mock_app:
             mock_app.state.cache = mock_cache
-            mock_main.app = mock_app
-
-            @cached_response(prefix="test", ttl_seconds=60)
-            async def test_func(arg1):
-                return mock_func(arg1)
-
             result = await test_func("value1")
 
-            assert result == "result"
-            mock_func.assert_called_once_with("value1")
-            mock_cache.get.assert_not_called()
-            mock_cache.set.assert_not_called()
+        assert result == "result_value1"
+        assert call_count == 1
+        mock_cache.get.assert_not_called()
+        mock_cache.set.assert_not_called()
