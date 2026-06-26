@@ -96,7 +96,9 @@ def check_queue_pressure() -> Optional[Tuple[str, Dict[str, Any]]]:
 
     depth = get_celery_queue_depth()
     if depth is None:
-        return "broker_unavailable", {}
+        # Broker unreachable is not a queue-depth overload signal. Let the
+        # request proceed so validation and enqueue logic can handle it.
+        return None
     if depth >= settings.load_shed_max_celery_queue_depth:
         return "queue_full", {
             "queue_depth": depth,

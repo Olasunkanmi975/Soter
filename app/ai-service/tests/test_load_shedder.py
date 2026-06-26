@@ -76,13 +76,22 @@ class TestQueuePressure:
         assert reason == "queue_full"
         assert details["queue_depth"] == 150
 
-    def test_broker_unavailable(self):
+    def test_broker_unavailable_does_not_shed(self):
         with patch(
             "services.load_shedder.get_celery_queue_depth", return_value=None
         ), patch("services.load_shedder.settings") as mock_settings:
             mock_settings.app_env = "production"
             result = check_queue_pressure()
-        assert result == ("broker_unavailable", {})
+        assert result is None
+
+    def test_inference_reaches_validation_when_broker_unreachable(self, client):
+        with patch("services.load_shedder.get_celery_queue_depth", return_value=None):
+            response = client.post(
+                "/v1/ai/inference",
+                content="not-json",
+                headers={"Content-Type": "application/json"},
+            )
+        assert response.status_code == 422
 
     def test_ensure_queue_capacity_raises(self):
         with patch(
