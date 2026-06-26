@@ -13,6 +13,8 @@ const BASE = `${API_URL}/v1/verification-inbox`;
 function buildParams(filters: Partial<ReviewFilters>): string {
   const p = new URLSearchParams();
   if (filters.status) p.set('status', filters.status);
+  if (filters.riskLevel) p.set('riskLevel', filters.riskLevel);
+  if (filters.campaignId) p.set('campaignId', filters.campaignId);
   if (filters.page && filters.page > 1) p.set('page', String(filters.page));
   if (filters.dateFrom) p.set('dateFrom', filters.dateFrom);
   if (filters.dateTo) p.set('dateTo', filters.dateTo);
