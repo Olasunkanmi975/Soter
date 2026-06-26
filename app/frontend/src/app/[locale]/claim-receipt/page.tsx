@@ -61,13 +61,18 @@ export default function ClaimReceiptPage() {
   const handleShare = async () => {
     if (!claim) return;
 
+    const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+
     try {
-      // Try Web Share API first
       if (navigator.share) {
         await navigator.share({
           title: 'Claim Receipt',
           text: `Claim ${claim.claimId} - ${claim.status}`,
+          url: pageUrl,
         });
+      } else {
+        // Fallback: copy URL to clipboard
+        await navigator.clipboard.writeText(pageUrl);
       }
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
