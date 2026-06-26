@@ -6,10 +6,14 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, Download, FileSpreadsheet, Re
 import { useToast } from '@/components/ToastProvider';
 import {
   buildValidationReport,
+  capValidationErrors,
   confirmRecipientsImport,
   parseRecipientsCsv,
-  type ParsedCsvData,
+  validateHeaders,
   validateRecipientsImport,
+  type HeaderValidationResult,
+  type ImportProgress,
+  type ParsedCsvData,
   type ValidationResult,
   type WizardStep,
 } from '@/lib/csv-validation';
@@ -41,10 +45,12 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [headerValidation, setHeaderValidation] = useState<HeaderValidationResult | null>(null);
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
 
   const summary = validationResult?.summary;
   const canAdvanceToPreview = Boolean(file && parsedData && !fileError);
-  const canAdvanceToValidation = Boolean(parsedData?.rows.length);
+  const canAdvanceToValidation = Boolean(parsedData?.rows.length && headerValidation?.valid !== false);
   const canAdvanceToConfirm = Boolean(validationResult);
   const hasBlockingErrors = Boolean(summary && summary.errorRows > 0);
   const previewRows = useMemo(() => parsedData?.rows.slice(0, 12) ?? [], [parsedData]);
@@ -56,6 +62,8 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
     setFileError(null);
     setSubmitMessage(null);
     setSubmitError(null);
+    setHeaderValidation(null);
+    setImportProgress(null);
 
     if (!nextFile) {
       return;
@@ -68,15 +76,31 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
 
     setIsParsing(true);
     try {
-      const data = await parseRecipientsCsv(nextFile);
+      const data = await parseRecipientsCsv(nextFile, (progress) => {
+        setImportProgress(progress);
+      });
       setParsedData(data);
-      toast('CSV ready', `Loaded ${data.rows.length} recipient rows for review.`, 'success');
+
+      const headerResult = validateHeaders(data.headers);
+      setHeaderValidation(headerResult);
+
+      if (!headerResult.valid) {
+        const missingCols = headerResult.errors.map(e => e.expectedKey).join(', ');
+        toast(
+          'Missing columns',
+          `Required columns not found: ${missingCols}. Check the CSV headers.`,
+          'warning',
+        );
+      } else {
+        toast('CSV ready', `Loaded ${data.rows.length} recipient rows for review.`, 'success');
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to parse the selected CSV file.';
       setFileError(message);
       toast('Upload problem', message, 'error');
     } finally {
       setIsParsing(false);
+      setImportProgress(null);
     }
   }
 
@@ -88,9 +112,12 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
     setIsValidating(true);
     setSubmitMessage(null);
     setSubmitError(null);
+    setImportProgress(null);
 
     try {
-      const result = await validateRecipientsImport(campaignId, file, parsedData.rows);
+      const result = await validateRecipientsImport(campaignId, file, parsedData.rows, (progress) => {
+        setImportProgress(progress);
+      });
       setValidationResult(result);
       setStep(3);
 
@@ -105,6 +132,7 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
       toast('Validation failed', message, 'error');
     } finally {
       setIsValidating(false);
+      setImportProgress(null);
     }
   }
 
@@ -152,12 +180,19 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
     setParsedData(null);
     setValidationResult(null);
     setFileError(null);
+    setHeaderValidation(null);
+    setImportProgress(null);
     setIsParsing(false);
     setIsValidating(false);
     setIsSubmitting(false);
     setSubmitMessage(null);
     setSubmitError(null);
   }
+
+  const cappedResult = useMemo(() => {
+    if (!validationResult) return null;
+    return capValidationErrors(validationResult);
+  }, [validationResult]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-white to-slate-50 px-4 py-8 dark:via-slate-950 dark:to-slate-950">
@@ -208,6 +243,7 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
                 file={file}
                 fileError={fileError}
                 isParsing={isParsing}
+                parseProgress={importProgress?.phase === 'parsing' ? importProgress : null}
                 onFileSelected={handleFileSelected}
                 onNext={() => setStep(2)}
                 canProceed={canAdvanceToPreview}
@@ -220,21 +256,25 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
                 headers={parsedData.headers}
                 previewRows={previewRows}
                 totalRows={parsedData.rows.length}
+                headerValidation={headerValidation}
+                isValidating={isValidating}
+                validateProgress={importProgress?.phase === 'validating' ? importProgress : null}
+                canProceed={canAdvanceToValidation}
                 onBack={() => setStep(1)}
                 onNext={handleRunValidation}
-                isValidating={isValidating}
-                canProceed={canAdvanceToValidation}
               />
             )}
 
-            {step === 3 && parsedData && validationResult && (
+            {step === 3 && parsedData && cappedResult && (
               <Step3Validation
-                result={validationResult}
+                result={cappedResult.display}
+                originalResult={validationResult!}
                 headers={parsedData.headers}
+                remainingErrors={cappedResult.remainingErrors}
+                remainingWarnings={cappedResult.remainingWarnings}
                 onBack={() => setStep(2)}
                 onNext={() => setStep(4)}
                 onDownloadReport={handleDownloadReport}
-                isValidating={isValidating}
                 canProceed={canAdvanceToConfirm}
               />
             )}
