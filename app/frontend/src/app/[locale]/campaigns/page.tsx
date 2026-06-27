@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AppEmptyState } from '@/components/empty-state/AppEmptyState';
 import { ExportControls } from '@/components/dashboard/ExportControls';
+import { useNetworkGuard } from '@/hooks/useNetworkGuard';
 import { useCampaigns, useCreateCampaign } from '@/hooks/useCampaigns';
 import { useCampaignAction } from '@/hooks/useOptimisticCampaignMutations';
 import { InlineFeedback, OptimisticStatusBadge } from '@/components/InlineFeedback';
@@ -37,6 +38,8 @@ export default function CampaignsPage() {
   const { data: campaigns = [], isLoading, isError, error } = useCampaigns();
   const createCampaign = useCreateCampaign();
   const campaignAction = useCampaignAction();
+
+  const { isMismatch, expectedNetwork } = useNetworkGuard();
 
   const [name, setName] = useState('');
   const [budget, setBudget] = useState('');
@@ -80,6 +83,10 @@ export default function CampaignsPage() {
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isMismatch) {
+      setFormMessage(`Cannot create campaign: wallet is on the wrong network. Switch to ${expectedNetwork.toUpperCase()} in Freighter.`);
+      return;
+    }
     if (!name.trim() || !budget.trim()) {
       setFormMessage('Name and budget are required.');
       return;
@@ -108,6 +115,7 @@ export default function CampaignsPage() {
   };
 
   const onPauseResume = async (id: string, campaignName: string, currentStatus: CampaignStatus) => {
+    if (isMismatch) return;
     const action = currentStatus === 'active' 
       ? { type: 'pause' as const, targetStatus: 'paused' as const }
       : { type: 'resume' as const, targetStatus: 'active' as const };
@@ -116,6 +124,7 @@ export default function CampaignsPage() {
   };
 
   const onArchive = async (id: string, campaignName: string) => {
+    if (isMismatch) return;
     campaignAction.mutate({ 
       id, 
       campaignName, 
@@ -186,7 +195,8 @@ export default function CampaignsPage() {
 
               <button
                 type="submit"
-                disabled={createCampaign.isPending}
+                disabled={createCampaign.isPending || isMismatch}
+                title={isMismatch ? `Wrong network — switch to ${expectedNetwork.toUpperCase()} in Freighter` : undefined}
                 className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {createCampaign.isPending ? 'Creating...' : 'Create campaign'}
@@ -289,7 +299,8 @@ export default function CampaignsPage() {
                           <button
                             type="button"
                             onClick={() => onPauseResume(campaign.id, campaign.name, campaign.status)}
-                            disabled={campaignAction.isPending}
+                            disabled={campaignAction.isPending || isMismatch}
+                            title={isMismatch ? `Wrong network — switch to ${expectedNetwork.toUpperCase()} in Freighter` : undefined}
                             className="rounded-md border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
                           >
                             {campaign.status === 'active' ? 'Pause' : 'Resume'}
@@ -297,7 +308,8 @@ export default function CampaignsPage() {
                           <button
                             type="button"
                             onClick={() => onArchive(campaign.id, campaign.name)}
-                            disabled={campaignAction.isPending || campaign.status === 'archived'}
+                            disabled={campaignAction.isPending || isMismatch || campaign.status === 'archived'}
+                            title={isMismatch ? `Wrong network — switch to ${expectedNetwork.toUpperCase()} in Freighter` : undefined}
                             className="rounded-md border border-red-400 px-3 py-1 text-sm text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20"
                           >
                             Archive
