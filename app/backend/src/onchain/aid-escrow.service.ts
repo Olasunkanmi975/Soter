@@ -12,7 +12,7 @@ import {
 } from './dto/aid-escrow.dto';
 import { BudgetService } from '../common/budget/budget.service';
 import { GetTransactionStatusResult } from './onchain.adapter';
-import { explorerTxUrl, explorerContractUrl } from '../common/utils/explorer-url.util';
+import { explorerTxUrl } from '../common/utils/explorer-url.util';
 
 /**
  * AidEscrowService
@@ -33,9 +33,14 @@ export class AidEscrowService {
     this.network = this.configService.get<string>('SOROBAN_NETWORK', 'testnet');
   }
 
-  private withTxExplorerUrl<T extends { transactionHash?: string }>(result: T): T & { explorerUrl?: string } {
+  private withTxExplorerUrl<T extends { transactionHash?: string }>(
+    result: T,
+  ): T & { explorerUrl?: string } {
     if (!result.transactionHash) return result;
-    return { ...result, explorerUrl: explorerTxUrl(result.transactionHash, this.network) };
+    return {
+      ...result,
+      explorerUrl: explorerTxUrl(result.transactionHash, this.network),
+    };
   }
 
   /**

@@ -15,6 +15,9 @@ export function explorerTxUrl(txHash: string, network: string): string {
 }
 
 /** Returns a link to a contract (account) on stellar.expert. */
-export function explorerContractUrl(contractId: string, network: string): string {
+export function explorerContractUrl(
+  contractId: string,
+  network: string,
+): string {
   return `${explorerBase(network)}/contract/${contractId}`;
 }
