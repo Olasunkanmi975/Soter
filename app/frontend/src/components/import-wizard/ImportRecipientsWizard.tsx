@@ -144,8 +144,10 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
 
       if (result.summary.errorRows > 0) {
         toast('Validation found issues', `${result.summary.errorRows} row(s) need correction before import.`, 'warning');
+        announce(`Validation complete. ${result.summary.errorRows} row(s) have errors that need correction.`);
       } else {
         toast('Validation complete', `${result.summary.validRows} valid row(s) ready to import.`, 'success');
+        announce(`Validation complete. ${result.summary.validRows} valid row(s) ready to import.`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to validate this import.';
@@ -208,6 +210,7 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
     setIsSubmitting(false);
     setSubmitMessage(null);
     setSubmitError(null);
+    announce('Started over. Step 1: Upload recipient file.');
   }
 
   const cappedResult = useMemo(() => {
@@ -316,6 +319,7 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
                 headers={parsedData.headers}
                 remainingErrors={cappedResult.remainingErrors}
                 remainingWarnings={cappedResult.remainingWarnings}
+                isValidating={isValidating}
                 canProceed={canAdvanceToConfirm}
                 headingRef={stepHeadingRef}
                 onBack={() => {
@@ -343,11 +347,22 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
                 }}
                 onConfirm={handleConfirmImport}
                 onStartOver={handleStartOver}
+                headingRef={stepHeadingRef}
               />
             )}
           </div>
 
           <aside className="space-y-4">
+            {/* Visually hidden polite live region for screen-reader announcements */}
+            <div
+              ref={liveRegionRef}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="sr-only"
+            >
+              {liveMessage}
+            </div>
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Progress</h2>
               <ol className="mt-4 space-y-3">
@@ -356,7 +371,11 @@ export function ImportRecipientsWizard({ campaignId }: ImportRecipientsWizardPro
                   const isComplete = item.id < step;
 
                   return (
-                    <li key={item.id} className="flex items-start gap-3">
+                    <li
+                      key={item.id}
+                      aria-current={isActive ? 'step' : undefined}
+                      className="flex items-start gap-3"
+                    >
                       <div
                         className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${
                           isComplete

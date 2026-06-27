@@ -69,11 +69,18 @@ fi
 SECRET_KEY="${SECRET_KEY:-$DEPLOYER_SECRET_KEY}"
 
 # Check if contract is built
-WASM_FILE="target/wasm32-unknown-unknown/release/${CONTRACT_NAME}.wasm"
+WASM_FILE="target/wasm32v1-none/release/${CONTRACT_NAME}.wasm"
 if [ ! -f "$WASM_FILE" ]; then
-    echo "❌ Contract not built: $WASM_FILE"
-    echo "   Run ./scripts/build.sh first"
-    exit 1
+    # Fallback: try legacy target path built by older toolchain versions
+    LEGACY_WASM="target/wasm32-unknown-unknown/release/${CONTRACT_NAME}.wasm"
+    if [ -f "$LEGACY_WASM" ]; then
+        WASM_FILE="$LEGACY_WASM"
+        echo "⚠️  Using legacy wasm32-unknown-unknown artifact. Consider rebuilding with Stellar CLI 26+."
+    else
+        echo "❌ Contract not built: $WASM_FILE"
+        echo "   Run 'stellar contract build' or './scripts/build.sh' first"
+        exit 1
+    fi
 fi
 
 # Extract contract version
@@ -90,11 +97,10 @@ echo "🔑 Using key: ${SECRET_KEY:0:10}..."
 echo ""
 echo "📡 Deploying to $NETWORK..."
 
-DEPLOY_OUTPUT=$(soroban contract deploy \
+DEPLOY_OUTPUT=$(stellar contract deploy \
     --wasm "$WASM_FILE" \
     --source "$SECRET_KEY" \
     --network "$NETWORK" \
-    --rpc-url "$RPC_URL" \
     2>&1 || true)
 
 if echo "$DEPLOY_OUTPUT" | grep -q "error"; then

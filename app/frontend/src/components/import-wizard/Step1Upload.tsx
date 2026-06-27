@@ -1,7 +1,6 @@
 'use client';
 
-import { ChangeEvent } from 'react';
-import type { RefObject } from 'react';
+import { ChangeEvent, RefObject } from 'react';
 import { FileText, LoaderCircle, UploadCloud } from 'lucide-react';
 import type { ParseProgress } from '@/lib/csv-validation';
 
@@ -31,7 +30,7 @@ export function Step1Upload({ file, fileError, isParsing, parseProgress, canProc
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Step 1: Upload recipient file</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-slate-900 dark:text-slate-50 focus:outline-none">Step 1: Upload recipient file</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Choose a CSV export from your recipient system. We&apos;ll parse the file locally first so you can inspect the shape before anything is submitted.
         </p>

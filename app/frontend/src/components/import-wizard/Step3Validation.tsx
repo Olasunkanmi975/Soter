@@ -10,6 +10,7 @@ interface Step3ValidationProps {
   headers: string[];
   remainingErrors: number;
   remainingWarnings: number;
+  isValidating: boolean;
   canProceed: boolean;
   headingRef?: RefObject<HTMLHeadingElement | null>;
   onBack: () => void;
@@ -29,6 +30,7 @@ export function Step3Validation({
   headers,
   remainingErrors,
   remainingWarnings,
+  isValidating,
   canProceed,
   headingRef,
   onBack,
@@ -43,7 +45,7 @@ export function Step3Validation({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-slate-900 dark:text-slate-50">Step 3: Resolve validation issues</h2>
+          <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-slate-900 dark:text-slate-50 focus:outline-none">Step 3: Resolve validation issues</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
             Review row-level warnings and errors before final confirmation. Errors block import until the source file is corrected and re-uploaded.
           </p>
@@ -153,6 +155,7 @@ export function Step3Validation({
         <button
           type="button"
           onClick={onBack}
+          disabled={isValidating}
           className="inline-flex min-w-28 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           <ChevronLeft className="h-4 w-4" />

@@ -23,7 +23,7 @@ class TestHumanitarianVerificationService:
         def fake_model(provider):
             return "test-model"
 
-        def fake_call_provider(provider, model, system_prompt, user_prompt):
+        def fake_call_provider(provider, model, system_prompt, user_prompt, timeout=None):
             calls.append((provider, model, system_prompt, user_prompt))
             if len(calls) == 1:
                 raise RuntimeError("primary model failure")
