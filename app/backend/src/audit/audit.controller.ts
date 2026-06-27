@@ -24,7 +24,10 @@ import { MetricsService } from '../metrics/metrics.service';
 @Controller('audit')
 @UseInterceptors(MetricsInterceptor)
 export class AuditController {
-  constructor(private readonly auditService: AuditService, private metricsService: MetricsService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private metricsService: MetricsService,
+  ) {}
 
   @Get()
   @Version('1')

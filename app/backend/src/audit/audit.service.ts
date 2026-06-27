@@ -93,7 +93,10 @@ export class AuditService {
       end();
       return result;
     } catch (error) {
-      this.metrics.dbErrorsTotal.inc({ operation: 'create', entity: 'AuditLog' });
+      this.metrics.dbErrorsTotal.inc({
+        operation: 'create',
+        entity: 'AuditLog',
+      });
       end();
       throw error;
     }
@@ -134,7 +137,10 @@ export class AuditService {
       end();
       return { data: rows, total, page, limit };
     } catch (error) {
-      this.metrics.dbErrorsTotal.inc({ operation: 'findMany', entity: 'AuditLog' });
+      this.metrics.dbErrorsTotal.inc({
+        operation: 'findMany',
+        entity: 'AuditLog',
+      });
       end();
       throw error;
     }
@@ -181,7 +187,10 @@ export class AuditService {
       ]);
       end();
     } catch (error) {
-      this.metrics.dbErrorsTotal.inc({ operation: 'export', entity: 'AuditLog' });
+      this.metrics.dbErrorsTotal.inc({
+        operation: 'export',
+        entity: 'AuditLog',
+      });
       end();
       throw error;
     }
