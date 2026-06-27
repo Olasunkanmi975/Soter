@@ -13,7 +13,7 @@ describe('Webhook Delivery E2E', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let hmacService: HmacService;
-  let webhooksQueue: Queue;
+  let _webhooksQueue: Queue;
   let server: http.Server;
   let receivedRequests: Array<{ headers: http.IncomingHttpHeaders; body: any }> = [];
   let serverPort: number;
@@ -65,7 +65,7 @@ describe('Webhook Delivery E2E', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     hmacService = moduleFixture.get<HmacService>(HmacService);
-    webhooksQueue = moduleFixture.get<Queue>(getQueueToken('webhooks'));
+    _webhooksQueue = moduleFixture.get<Queue>(getQueueToken('webhooks'));
   });
 
   afterAll(async () => {
