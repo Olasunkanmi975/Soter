@@ -10,7 +10,7 @@ import TestnetFaucetHelper from '@/components/systems/TestnetFaucetHelper';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { MisconfiguredPage } from '@/components/MisconfiguredPage';
-import { NetworkMismatchBanner } from '@/components/NetworkMismatchBanner';
+import { VersionProvider } from '@/components/VersionProvider';
 import { validateEnv } from '@/lib/env';
 
 const geistSans = Geist({
@@ -63,14 +63,14 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages}>
           <ThemeProvider>
             <ErrorBoundary>
-              <QueryProvider>
-                <ToastProvider>
-                  <Navbar />
-                  <NetworkMismatchBanner />
-                  {children}
-                  <TestnetFaucetHelper />
-                </ToastProvider>
-              </QueryProvider>
+              <VersionProvider>
+                <QueryProvider>
+                  <ToastProvider>
+                    <Navbar />
+                    {children}
+                  </ToastProvider>
+                </QueryProvider>
+              </VersionProvider>
             </ErrorBoundary>
           </ThemeProvider>
         </NextIntlClientProvider>
