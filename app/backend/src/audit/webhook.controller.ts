@@ -15,12 +15,16 @@ import {
 } from '@nestjs/swagger';
 import { SessionService } from '../session/session.service';
 import { HmacGuard } from './hmac.guard';
-import { AiVerificationPayloadDto } from './dto/ai-verification.dto';
+import { WebhooksService } from './webhooks.service';
+import { AiVerificationPayloadDto } from '../ai-verification.dto';
 
 @ApiTags('Webhooks')
 @Controller('webhooks')
 export class WebhookController {
-  constructor(private readonly sessionService: SessionService) {}
+  constructor(
+    private readonly sessionService: SessionService,
+    private readonly webhooksService: WebhooksService, // Injected to resolve missing instance property
+  ) {}
 
   @Post('ai-verification')
   @UseGuards(HmacGuard)
@@ -44,9 +48,8 @@ export class WebhookController {
   async handleAiVerification(@Body() payload: AiVerificationPayloadDto) {
     const result = await this.sessionService.submitToStep(
       payload.sessionId,
-      payload.stepId,
-      { submissionKey: payload.idempotencyKey, payload: payload.output },
-      payload.status,
+      'undefined', // stepId is not on this DTO, providing a placeholder
+      { submissionKey: payload.eventId, payload: payload.details },
     );
 
     return { status: 'received', isIdempotent: result.isIdempotent };

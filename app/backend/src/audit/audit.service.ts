@@ -3,9 +3,8 @@ import { createHash } from 'crypto';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
-
-import { MetricsService } from '../metrics/metrics.service';
 import { Prisma } from '@prisma/client';
+import { MetricsService } from 'src/audit/metrics.service';
 
 export interface AuditLogParams {
   actorId: string;

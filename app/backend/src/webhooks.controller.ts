@@ -7,8 +7,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { WebhooksService } from './webhooks.service';
-import { HmacAuthGuard } from './guards/hmac-auth.guard';
-import { AiVerificationPayloadDto } from './dto/ai-verification.dto';
+import { HmacAuthGuard } from './hmac-auth.guard';
+import { AiVerificationPayloadDto } from 'src/ai-verification.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 
 @ApiTags('Webhooks')

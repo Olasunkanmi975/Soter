@@ -9,7 +9,7 @@ import {
   ApiUnauthorizedResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { MetricsService } from '../metrics/metrics.service';
+import { MetricsService } from 'src/audit/metrics.service';
 
 @ApiTags('Audit')
 @ApiBearerAuth('JWT-auth')

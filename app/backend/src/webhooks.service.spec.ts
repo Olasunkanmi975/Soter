@@ -1,13 +1,30 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WebhooksService } from './webhooks.service';
-import { SessionService } from '../session/session.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { SessionService } from 'src/session/session.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import {
   AiVerificationPayloadDto,
   VerificationStatus,
-} from './dto/ai-verification.dto';
+} from 'src/ai-verification.dto';
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { SessionStatus, StepStatus } from '@prisma/client';
+
+// Intercept and mock Prisma runtime enums to prevent 'undefined' property reading failures
+jest.mock('@prisma/client', () => {
+  return {
+    ...jest.requireActual('@prisma/client'),
+    SessionStatus: {
+      pending: 'pending',
+      approved: 'approved',
+      disbursed: 'disbursed',
+    },
+    StepStatus: {
+      pending: 'pending',
+      in_progress: 'in_progress',
+      completed: 'completed',
+      failed: 'failed',
+    },
+  };
+});
 
 describe('WebhooksService', () => {
   let service: WebhooksService;
@@ -78,8 +95,8 @@ describe('WebhooksService', () => {
       mockPrisma.webhookEvent.findUnique.mockResolvedValue(null);
       mockSessionService.getSession.mockResolvedValue({
         id: 'sess_456',
-        status: SessionStatus.pending,
-        steps: [{ stepName: 'other_step', status: StepStatus.pending }],
+        status: 'pending',
+        steps: [{ stepName: 'other_step', status: 'pending' }],
       });
 
       await expect(service.processAiVerification(payload)).rejects.toThrow(
@@ -92,12 +109,12 @@ describe('WebhooksService', () => {
       mockPrisma.webhookEvent.findUnique.mockResolvedValue(null);
       mockSessionService.getSession.mockResolvedValue({
         id: 'sess_456',
-        status: SessionStatus.pending,
+        status: 'pending',
         steps: [
           {
             id: stepId,
             stepName: 'identity_verification',
-            status: StepStatus.in_progress,
+            status: 'in_progress',
           },
         ],
       });

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
-import { MetricsService } from '../metrics/metrics.service';
+import { MetricsService } from 'src/audit/metrics.service';
 
 describe('AuditController', () => {
   let controller: AuditController;

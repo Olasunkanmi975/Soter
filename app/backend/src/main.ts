@@ -8,6 +8,7 @@ import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { config as loadEnv } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { json, urlencoded } from 'express';
 
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 import {

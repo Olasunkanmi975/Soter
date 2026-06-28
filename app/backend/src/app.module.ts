@@ -47,7 +47,7 @@ import { SandboxModule } from './sandbox/sandbox.module';
 import { CacheModule } from './common/cache/cache.module';
 import { CacheResponseInterceptor } from './common/interceptors/cache-response.interceptor';
 
-import { WebhooksModule } from './webhooks/webhooks.module';
+import { WebhooksModule } from 'src/webhooks.module';
 @Module({
   imports: [
     ConfigModule.forRoot({

@@ -9,6 +9,10 @@ import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import * as crypto from 'crypto';
 
+interface RequestWithRawBody extends Request {
+  rawBody?: Buffer;
+}
+
 @Injectable()
 export class HmacAuthGuard implements CanActivate {
   private readonly logger = new Logger(HmacAuthGuard.name);
@@ -23,7 +27,7 @@ export class HmacAuthGuard implements CanActivate {
   }
 
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<RequestWithRawBody>();
     const signature = request.header('X-Signature-256');
 
     if (!signature) {

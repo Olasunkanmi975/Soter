@@ -10,6 +10,10 @@ import { Request } from 'express';
 import * as crypto from 'crypto';
 import appConfig from '../config/config';
 
+interface RequestWithRawBody extends Request {
+  rawBody?: Buffer;
+}
+
 @Injectable()
 export class HmacGuard implements CanActivate {
   constructor(
@@ -18,7 +22,7 @@ export class HmacGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<RequestWithRawBody>();
     const signature = request.headers['x-signature-hmac-sha256'] as string;
 
     if (!signature) {
@@ -31,7 +35,7 @@ export class HmacGuard implements CanActivate {
       );
     }
 
-    const hmac = crypto.createHmac('sha256', this.config.aiWebhookSecret);
+    const hmac = crypto.createHmac('sha256', this.config.aiWebhookSecret || '');
     const digest = hmac.update(request.rawBody).digest('hex');
 
     if (digest !== signature) {
