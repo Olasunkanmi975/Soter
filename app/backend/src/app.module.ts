@@ -23,6 +23,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ApiKeyGuard } from './common/guards/api-key.guard';
 import { RolesGuard } from './auth/roles.guard';
+import { ScopesGuard } from './api-keys/scopes.guard';
 import { ObservabilityModule } from './observability/observability.module';
 import { ClaimsModule } from './claims/claims.module';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
@@ -150,6 +151,10 @@ import { WebhooksModule } from 'src/webhooks.module';
     {
       provide: APP_GUARD,
       useClass: RolesGuard, // runs second — checks request.user.role against @Roles()
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ScopesGuard, // runs third — checks request.user.scopes against @Scopes()
     },
     {
       provide: APP_GUARD,
