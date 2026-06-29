@@ -107,7 +107,33 @@ class TestOCREnvelope:
 
     def test_anchor_metadata_passthrough(self):
         anchor = json.dumps({"campaign_ref": "camp-001", "claim_id": "c-123"})
-        data = self._post_ocr(anchor_metadata=anchor)
+        fake_with_anchor = {
+            "success": True,
+            "data": {
+                "fields": {
+                    "full_name": {"value": "Jane Doe", "confidence": 0.95},
+                    "id_number": {"value": "987654321", "confidence": 0.88},
+                },
+                "raw_text": "Jane Doe\nID: 987654321",
+                "processing_time_ms": 120,
+            },
+            "processing_time_ms": 120,
+            # anchor_metadata returned as a parsed dict by run_ocr_from_bytes
+            "anchor_metadata": {"campaign_ref": "camp-001", "claim_id": "c-123"},
+        }
+        from io import BytesIO
+        from PIL import Image
+
+        buf = BytesIO()
+        Image.new("RGB", (10, 10), color=(255, 0, 0)).save(buf, format="PNG")
+        buf.seek(0)
+        data: Dict[str, Any] = {
+            "image": ("test.png", buf, "image/png"),
+            "anchor_metadata": (None, anchor),
+        }
+        with patch("api.v1.ocr.run_ocr_from_bytes", return_value=fake_with_anchor):
+            resp = client.post("/v1/ai/ocr", files=data)
+        data = resp.json()
         assert data["anchor_metadata"] is not None
         assert data["anchor_metadata"]["campaign_ref"] == "camp-001"
 

@@ -139,6 +139,17 @@ class TestOCRLegacyPath:
 
 
 class TestOCRV1Path:
+    _FAKE_OCR = {
+        "success": True,
+        "data": {
+            "fields": {"full_name": {"value": "Test Name", "confidence": 0.90}},
+            "raw_text": "Test Name",
+            "processing_time_ms": 50,
+        },
+        "processing_time_ms": 50,
+        "anchor_metadata": None,
+    }
+
     def test_v1_ocr_no_image_returns_422(self, client):
         response = client.post("/v1/ai/ocr")
         assert response.status_code == 422
@@ -156,10 +167,11 @@ class TestOCRV1Path:
         img = Image.new("RGB", (60, 60), color="green")
         buf = io.BytesIO()
         img.save(buf, format="PNG")
-        response = client.post(
-            "/v1/ai/ocr",
-            files={"image": ("img.png", buf.getvalue(), "image/png")},
-        )
+        with patch("api.v1.ocr.run_ocr_from_bytes", return_value=self._FAKE_OCR):
+            response = client.post(
+                "/v1/ai/ocr",
+                files={"image": ("img.png", buf.getvalue(), "image/png")},
+            )
         assert response.status_code == 200
 
     def test_v1_ocr_processing_time_present(self, client):
@@ -168,10 +180,11 @@ class TestOCRV1Path:
         img = Image.new("RGB", (60, 60), color="red")
         buf = io.BytesIO()
         img.save(buf, format="PNG")
-        response = client.post(
-            "/v1/ai/ocr",
-            files={"image": ("img.png", buf.getvalue(), "image/png")},
-        )
+        with patch("api.v1.ocr.run_ocr_from_bytes", return_value=self._FAKE_OCR):
+            response = client.post(
+                "/v1/ai/ocr",
+                files={"image": ("img.png", buf.getvalue(), "image/png")},
+            )
         assert response.status_code == 200
         data = response.json()
         # OCR is now a ResultEnvelope; processing_time_ms lives inside result
@@ -333,7 +346,7 @@ class TestHumanitarianV1:
         assert data["result"]["verification"]["verdict"] == "credible"
         assert data["confidence"] == pytest.approx(0.88)
 
-    def test_v1_humanitarian_verify_failure_path(self, following_client, monkeypatch):
+    def test_v1_humanitarian_verify_failure_path(self, monkeypatch):
         def fake_verify(
             aid_claim,
             supporting_evidence=None,
@@ -346,7 +359,9 @@ class TestHumanitarianV1:
             main.humanitarian_verification_service, "verify_claim", fake_verify
         )
 
-        response = following_client.post(
+        # Use raise_server_exceptions=False so RuntimeError returns a 500 response
+        safe_client = TestClient(app, raise_server_exceptions=False)
+        response = safe_client.post(
             "/v1/ai/humanitarian/verify",
             json={
                 "aid_claim": "Claim text.",
@@ -355,7 +370,7 @@ class TestHumanitarianV1:
                 "provider_preference": "auto",
             },
         )
-        # The v1 endpoint now re-raises; the global handler returns 500 error envelope
+        # The v1 endpoint re-raises; the global handler returns 500 error envelope
         assert response.status_code == 500
         data = response.json()
         assert "error" in data
@@ -370,7 +385,7 @@ class TestHumanitarianV1:
 class TestLegacyV1Parity:
     """
     Verify that following a legacy redirect gives the same response shape
-    as calling /v1 directly.
+    as calling /v1 directly (both now return ResultEnvelope).
     """
 
     def test_anonymize_parity(self, following_client):
@@ -380,10 +395,10 @@ class TestLegacyV1Parity:
         legacy_resp = following_client.post("/ai/anonymize", json=payload)
 
         assert v1_resp.status_code == legacy_resp.status_code == 200
-        # v1 returns ResultEnvelope; legacy returns old flat shape — both are 200 successes
-        assert "result" in v1_resp.json()       # new envelope
-        assert "success" in legacy_resp.json()  # old shape
-        assert legacy_resp.json()["success"] is True
+        # Both paths now go to the v1 endpoint and return ResultEnvelope
+        assert "result" in v1_resp.json()
+        assert "result" in legacy_resp.json()
+        assert "anonymized_text" in v1_resp.json()["result"]
 
     def test_proof_of_life_parity(self, following_client, monkeypatch):
         fake_result = {
@@ -406,9 +421,9 @@ class TestLegacyV1Parity:
         legacy_resp = following_client.post("/ai/proof-of-life", json=payload)
 
         assert v1_resp.status_code == legacy_resp.status_code == 200
-        # v1 returns ResultEnvelope; legacy returns old flat shape — both succeed
+        # Both return ResultEnvelope now
+        assert v1_resp.json() == legacy_resp.json()
         assert "result" in v1_resp.json()
-        assert "is_real_person" in legacy_resp.json()
 
     def test_humanitarian_parity(self, following_client, monkeypatch):
         fake_result = {
@@ -440,9 +455,9 @@ class TestLegacyV1Parity:
         legacy_resp = following_client.post("/ai/humanitarian/verify", json=payload)
 
         assert v1_resp.status_code == legacy_resp.status_code == 200
-        # v1 returns ResultEnvelope; legacy returns old flat shape — both succeed
+        # Both return ResultEnvelope now
+        assert v1_resp.json() == legacy_resp.json()
         assert "result" in v1_resp.json()
-        assert "success" in legacy_resp.json()
 
 
 # ---------------------------------------------------------------------------

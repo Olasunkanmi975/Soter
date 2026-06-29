@@ -59,9 +59,8 @@ class TestOCRRoutes:
         )
         assert response.status_code == 200
         data = response.json()
-        # OCR now returns a ResultEnvelope; processing_time_ms lives inside result
-        assert "result" in data
-        assert "processing_time_ms" in data["result"]
+        # Legacy /ai/ocr returns OCRResponse (old flat shape)
+        assert "processing_time_ms" in data
 
 
 class TestRootEndpoint:
