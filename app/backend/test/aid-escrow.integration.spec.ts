@@ -17,8 +17,12 @@ import { SorobanEventCorrelationService } from '../src/onchain/soroban-event-cor
 const mockEventCorrelationService = {
   getCorrelationsForPackage: jest.fn().mockResolvedValue([]),
   getCorrelationsForClaim: jest.fn().mockResolvedValue([]),
-  correlateTransaction: jest.fn().mockResolvedValue({ correlated: 0, skipped: 0, errors: 0, details: [] }),
-  getAllCorrelations: jest.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 20 }),
+  correlateTransaction: jest
+    .fn()
+    .mockResolvedValue({ correlated: 0, skipped: 0, errors: 0, details: [] }),
+  getAllCorrelations: jest
+    .fn()
+    .mockResolvedValue({ data: [], total: 0, page: 1, limit: 20 }),
 };
 
 describe('AidEscrow Integration Tests', () => {

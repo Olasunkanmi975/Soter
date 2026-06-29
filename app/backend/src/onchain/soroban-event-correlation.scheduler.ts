@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { SorobanEventCorrelationService, CorrelationJobData } from './soroban-event-correlation.service';
+import { SorobanEventCorrelationService } from './soroban-event-correlation.service';
 import { MetricsService } from '../observability/metrics/metrics.service';
 
 export interface EventCorrelationJobData {
@@ -44,7 +44,7 @@ export class SorobanEventCorrelationScheduler {
 
     try {
       // Determine ledger range to process
-      const endLedger = await this.getLatestLedger();
+      const endLedger = this.getLatestLedger();
       const startLedger = this.lastProcessedLedger
         ? this.lastProcessedLedger + 1
         : endLedger - 100; // Default to last 100 ledgers on first run
@@ -54,7 +54,9 @@ export class SorobanEventCorrelationScheduler {
         return;
       }
 
-      this.logger.log(`Scheduled event correlation: ledgers ${startLedger}-${endLedger}`);
+      this.logger.log(
+        `Scheduled event correlation: ledgers ${startLedger}-${endLedger}`,
+      );
 
       const jobData: EventCorrelationJobData = {
         startLedger,
@@ -77,18 +79,28 @@ export class SorobanEventCorrelationScheduler {
       const duration = (Date.now() - startTime) / 1000;
       this.logger.log(`Scheduled event correlation queued in ${duration}s`);
 
-      this.metricsService.incrementCounter('soroban_event_correlation_scheduled', {
-        ledgersProcessed: (endLedger - startLedger + 1).toString(),
-      });
+      this.metricsService.incrementCounter(
+        'soroban_event_correlation_scheduled',
+        {
+          ledgersProcessed: (endLedger - startLedger + 1).toString(),
+        },
+      );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to schedule event correlation: ${errorMessage}`, {
-        error: errorMessage,
-      });
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to schedule event correlation: ${errorMessage}`,
+        {
+          error: errorMessage,
+        },
+      );
 
-      this.metricsService.incrementCounter('soroban_event_correlation_scheduling_failed', {
-        error: errorMessage.substring(0, 100),
-      });
+      this.metricsService.incrementCounter(
+        'soroban_event_correlation_scheduling_failed',
+        {
+          error: errorMessage.substring(0, 100),
+        },
+      );
     } finally {
       this.isProcessing = false;
     }
@@ -97,7 +109,7 @@ export class SorobanEventCorrelationScheduler {
   /**
    * Get the latest ledger from the network
    */
-  private async getLatestLedger(): Promise<number> {
+  private getLatestLedger(): number {
     // In a real implementation, this would query the RPC for the latest ledger
     // For now, we'll use a reasonable default
     return Math.floor(Date.now() / 5000) * 5000; // Approximate ledger number
@@ -149,15 +161,19 @@ export class SorobanEventCorrelationScheduler {
     // We pass the txHash in the job data for the processor to use
     (jobData as any).txHash = txHash;
 
-    const job = await this.onchainQueue.add('event-correlation-transaction', jobData, {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000,
+    const job = await this.onchainQueue.add(
+      'event-correlation-transaction',
+      jobData,
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+        removeOnComplete: 50,
+        removeOnFail: 20,
       },
-      removeOnComplete: 50,
-      removeOnFail: 20,
-    });
+    );
 
     this.logger.log(`On-demand transaction correlation triggered`, {
       jobId: job.id,

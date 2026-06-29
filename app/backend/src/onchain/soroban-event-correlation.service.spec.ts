@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { SorobanEventCorrelationService, SorobanEvent } from './soroban-event-correlation.service';
+import {
+  SorobanEventCorrelationService,
+  SorobanEvent,
+} from './soroban-event-correlation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { MetricsService } from '../observability/metrics/metrics.service';
@@ -42,7 +45,9 @@ describe('SorobanEventCorrelationService', () => {
       ],
     }).compile();
 
-    service = module.get<SorobanEventCorrelationService>(SorobanEventCorrelationService);
+    service = module.get<SorobanEventCorrelationService>(
+      SorobanEventCorrelationService,
+    );
   });
 
   afterEach(() => {

@@ -12,8 +12,12 @@ import { SorobanEventCorrelationService } from '../src/onchain/soroban-event-cor
 const mockEventCorrelationService = {
   getCorrelationsForPackage: jest.fn().mockResolvedValue([]),
   getCorrelationsForClaim: jest.fn().mockResolvedValue([]),
-  correlateTransaction: jest.fn().mockResolvedValue({ correlated: 0, skipped: 0, errors: 0, details: [] }),
-  getAllCorrelations: jest.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 20 }),
+  correlateTransaction: jest
+    .fn()
+    .mockResolvedValue({ correlated: 0, skipped: 0, errors: 0, details: [] }),
+  getAllCorrelations: jest
+    .fn()
+    .mockResolvedValue({ data: [], total: 0, page: 1, limit: 20 }),
 };
 
 describe('Transaction Status Polling', () => {
@@ -35,7 +39,10 @@ describe('Transaction Status Polling', () => {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue('testnet') },
         },
-        { provide: SorobanEventCorrelationService, useValue: mockEventCorrelationService },
+        {
+          provide: SorobanEventCorrelationService,
+          useValue: mockEventCorrelationService,
+        },
       ],
     }).compile();
 

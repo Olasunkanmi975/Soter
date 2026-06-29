@@ -1,12 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import {
-  rpc as SorobanRpc,
-  Contract,
-  xdr,
-  scValToNative,
-} from '@stellar/stellar-sdk';
+import { rpc as SorobanRpc, xdr, scValToNative } from '@stellar/stellar-sdk';
 import { MetricsService } from '../observability/metrics/metrics.service';
 import { withRetryTimeout } from './utils/retry-with-timeout';
 
@@ -38,6 +33,12 @@ export interface SorobanEvent {
   txHash: string;
   ledger: number;
   eventIndex: number;
+}
+
+interface ExtractedContractEvent {
+  topic: xdr.ScVal[];
+  value: xdr.ScVal;
+  contractId: string;
 }
 
 @Injectable()
@@ -72,24 +73,24 @@ export class SorobanEventCorrelationService {
 
   // Mapping from contract event topics to our internal enum
   private readonly TOPIC_MAP: Record<string, string> = {
-    'package_created': 'package_created',
-    'package_claimed': 'package_claimed',
-    'package_disbursed': 'package_disbursed',
-    'package_cancelled': 'package_cancelled',
-    'package_expired': 'package_expired',
-    'package_refunded': 'package_refunded',
-    'package_revoked': 'package_revoked',
-    'claim_created': 'claim_created',
-    'claim_verified': 'claim_verified',
-    'claim_approved': 'claim_approved',
-    'claim_disbursed': 'claim_disbursed',
-    'claim_cancelled': 'claim_cancelled',
-    'claim_archived': 'claim_archived',
-    'escrow_initialized': 'escrow_initialized',
-    'config_updated': 'config_updated',
-    'admin_updated': 'admin_updated',
-    'tokens_allowed': 'tokens_allowed',
-    'tokens_removed': 'tokens_removed',
+    package_created: 'package_created',
+    package_claimed: 'package_claimed',
+    package_disbursed: 'package_disbursed',
+    package_cancelled: 'package_cancelled',
+    package_expired: 'package_expired',
+    package_refunded: 'package_refunded',
+    package_revoked: 'package_revoked',
+    claim_created: 'claim_created',
+    claim_verified: 'claim_verified',
+    claim_approved: 'claim_approved',
+    claim_disbursed: 'claim_disbursed',
+    claim_cancelled: 'claim_cancelled',
+    claim_archived: 'claim_archived',
+    escrow_initialized: 'escrow_initialized',
+    config_updated: 'config_updated',
+    admin_updated: 'admin_updated',
+    tokens_allowed: 'tokens_allowed',
+    tokens_removed: 'tokens_removed',
   };
 
   constructor(
@@ -124,7 +125,9 @@ export class SorobanEventCorrelationService {
    * Main entry point for event correlation
    * Fetches events from Soroban RPC and correlates them to internal records
    */
-  async correlateEvents(data: CorrelationJobData): Promise<EventCorrelationResult> {
+  async correlateEvents(
+    data: CorrelationJobData,
+  ): Promise<EventCorrelationResult> {
     const { startLedger, endLedger, contractId, correlationSource } = data;
     const targetContractId = contractId || this.contractId;
 
@@ -139,19 +142,28 @@ export class SorobanEventCorrelationService {
 
     try {
       // Fetch events from Soroban RPC
-      const events = await this.fetchEvents(targetContractId, startLedger, endLedger);
+      const events = await this.fetchEvents(
+        targetContractId,
+        startLedger,
+        endLedger,
+      );
 
       this.logger.log(`Fetched ${events.length} events from Soroban RPC`);
 
       // Filter to only correlated topics
-      const relevantEvents = events.filter((e) =>
+      const relevantEvents = events.filter(e =>
         this.CORRELATED_TOPICS.has(e.topic),
       );
 
-      this.logger.log(`${relevantEvents.length} events match correlated topics`);
+      this.logger.log(
+        `${relevantEvents.length} events match correlated topics`,
+      );
 
       // Process each event
-      const result = await this.processEvents(relevantEvents, correlationSource);
+      const result = await this.processEvents(
+        relevantEvents,
+        correlationSource,
+      );
 
       const duration = (Date.now() - startTime) / 1000;
 
@@ -174,7 +186,8 @@ export class SorobanEventCorrelationService {
 
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.error(`Event correlation failed: ${errorMessage}`, {
         error: errorMessage,
       });
@@ -196,20 +209,27 @@ export class SorobanEventCorrelationService {
   ): Promise<SorobanEvent[]> {
     const server = this.getServer();
 
-    // Build filters for getEvents
-    const filters: SorobanRpc.Api.GetEventsFilter[] = [
-      {
-        type: 'contract',
-        contractIds: [contractId],
-      },
-    ];
-
-    if (startLedger !== undefined) {
-      filters.push({ type: 'ledgerRange', startLedger, endLedger: endLedger || startLedger + 1000 });
-    }
+    const contractFilter: SorobanRpc.Api.EventFilter = {
+      type: 'contract',
+      contractIds: [contractId],
+    };
 
     const response = await withRetryTimeout(
-      () => server.getEvents({ filters, limit: 1000 }),
+      () => {
+        if (startLedger !== undefined) {
+          return server.getEvents({
+            filters: [contractFilter],
+            startLedger,
+            endLedger: endLedger || startLedger + 1000,
+            limit: 1000,
+          });
+        }
+        return server.getEvents({
+          filters: [contractFilter],
+          cursor: '0',
+          limit: 1000,
+        });
+      },
       'getEvents',
       `correlation-${Date.now()}`,
       { maxRetries: 3, baseDelayMs: 1000 },
@@ -220,21 +240,17 @@ export class SorobanEventCorrelationService {
 
     if (response.events) {
       for (const event of response.events) {
-        // Parse event data
         const topic = this.extractEventTopic(event);
         if (!topic) continue;
 
         const payload = this.parseEventPayload(event);
-        const txHash = event.txHash?.toString('hex') || '';
-        const ledger = event.ledger || 0;
-        const eventIndex = event.idx || 0;
 
         events.push({
           topic,
           payload,
-          txHash,
-          ledger,
-          eventIndex,
+          txHash: event.txHash || '',
+          ledger: event.ledger || 0,
+          eventIndex: event.transactionIndex || 0,
         });
       }
     }
@@ -245,12 +261,11 @@ export class SorobanEventCorrelationService {
   /**
    * Extract event topic from Soroban event
    */
-  private extractEventTopic(event: SorobanRpc.Api.Event): string | null {
-    // Event topics are in the topics array, first element is typically the event name
-    if (event.topics && event.topics.length > 0) {
-      const firstTopic = event.topics[0];
-      if (firstTopic.type === 'scvSymbol') {
-        return firstTopic.value;
+  private extractEventTopic(event: { topic?: xdr.ScVal[] }): string | null {
+    if (event.topic && event.topic.length > 0) {
+      const native = scValToNative(event.topic[0]);
+      if (typeof native === 'string') {
+        return native;
       }
     }
     return null;
@@ -259,12 +274,12 @@ export class SorobanEventCorrelationService {
   /**
    * Parse event payload from Soroban event
    */
-  private parseEventPayload(event: SorobanRpc.Api.Event): unknown {
-    if (event.data) {
+  private parseEventPayload(event: { value?: xdr.ScVal }): unknown {
+    if (event.value) {
       try {
-        return scValToNative(event.data);
+        return scValToNative(event.value);
       } catch {
-        return event.data.toString();
+        return event.value.toXDR().toString('base64');
       }
     }
     return null;
@@ -286,7 +301,10 @@ export class SorobanEventCorrelationService {
 
     for (const event of events) {
       try {
-        const detail = await this.correlateSingleEvent(event, correlationSource);
+        const detail = await this.correlateSingleEvent(
+          event,
+          correlationSource,
+        );
         result.details.push(detail);
 
         if (detail.success) {
@@ -295,7 +313,8 @@ export class SorobanEventCorrelationService {
           result.errors++;
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         result.errors++;
         result.details.push({
           txHash: event.txHash,
@@ -411,7 +430,8 @@ export class SorobanEventCorrelationService {
 
     for (const path of paths) {
       const value = this.getNestedValue(payload, path);
-      if (value !== undefined && value !== null) {
+      if (typeof value === 'string') return value;
+      if (typeof value === 'number' || typeof value === 'bigint') {
         return String(value);
       }
     }
@@ -434,7 +454,8 @@ export class SorobanEventCorrelationService {
 
     for (const path of paths) {
       const value = this.getNestedValue(payload, path);
-      if (value !== undefined && value !== null) {
+      if (typeof value === 'string') return value;
+      if (typeof value === 'number' || typeof value === 'bigint') {
         return String(value);
       }
     }
@@ -481,30 +502,36 @@ export class SorobanEventCorrelationService {
       );
 
       if (result.status !== SorobanRpc.Api.GetTransactionStatus.SUCCESS) {
-        throw new Error(`Transaction ${txHash} not successful: ${result.status}`);
+        throw new Error(
+          `Transaction ${txHash} not successful: ${result.status}`,
+        );
       }
 
       // Get events from transaction
-      const events = await this.getEventsFromTransaction(result);
+      const events = this.getEventsFromTransaction(result);
 
       // Filter to our contract
       const contractEvents = events.filter(
-        (e) => e.contractId === this.contractId,
+        e => e.contractId === this.contractId,
       );
 
-      // Convert to our event format
-      const sorobanEvents: SorobanEvent[] = contractEvents.map((e, idx) => ({
-        topic: this.extractEventTopic(e) || '',
-        payload: this.parseEventPayload(e),
-        txHash,
-        ledger: result.ledger || 0,
-        eventIndex: idx,
-      })).filter((e) => e.topic);
+      const sorobanEvents: SorobanEvent[] = contractEvents
+        .map((e, idx) => ({
+          topic: this.extractEventTopic(e) || '',
+          payload: this.parseEventPayload(e),
+          txHash,
+          ledger: result.ledger || 0,
+          eventIndex: idx,
+        }))
+        .filter(e => e.topic);
 
       return this.processEvents(sorobanEvents, correlationSource);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to correlate transaction ${txHash}: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to correlate transaction ${txHash}: ${errorMessage}`,
+      );
       throw error;
     }
   }
@@ -514,19 +541,25 @@ export class SorobanEventCorrelationService {
    */
   private getEventsFromTransaction(
     result: SorobanRpc.Api.GetSuccessfulTransactionResponse,
-  ): SorobanRpc.Api.Event[] {
+  ): ExtractedContractEvent[] {
     if (result.resultMetaXdr) {
       try {
-        const meta = xdr.TransactionMeta.fromXDR(result.resultMetaXdr, 'base64');
-        const events = meta.v3().sorobanMeta()?.events() || [];
-        return events.map((e) => ({
-          topics: e.topics().map((t) => scValToNative(t)),
-          data: scValToNative(e.data()),
-          contractId: e.contractId().toString('hex'),
-          txHash: result.hash,
-          ledger: result.ledger,
-          idx: 0, // Will be overridden
-        }));
+        const meta = result.resultMetaXdr;
+        const sorobanMeta = meta.v3().sorobanMeta();
+        if (!sorobanMeta) return [];
+        const contractEvents = sorobanMeta.events();
+        return contractEvents.map(e => {
+          const v0 = e.body().v0();
+          const contractIdHash = e.contractId();
+          const contractIdStr = contractIdHash
+            ? Buffer.from(contractIdHash as unknown as Buffer).toString('hex')
+            : '';
+          return {
+            topic: v0.topics(),
+            value: v0.data(),
+            contractId: contractIdStr,
+          };
+        });
       } catch {
         return [];
       }
