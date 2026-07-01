@@ -297,7 +297,7 @@ export class VerificationService {
       data: {
         status: shouldVerify ? 'verified' : 'requested',
         anchorMetadata: anchorMetadataToPersist === null
-          ? null
+          ? Prisma.JsonNull
           : (anchorMetadataToPersist as Prisma.InputJsonValue),
       },
     });
