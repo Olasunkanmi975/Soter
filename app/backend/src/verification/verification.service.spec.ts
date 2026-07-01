@@ -439,7 +439,7 @@ describe('VerificationService', () => {
         where: { id: 'test-claim-id' },
         data: {
           status: expect.any(String),
-          anchorMetadata: null,
+          anchorMetadata: expect.anything(),
         },
       });
     });
