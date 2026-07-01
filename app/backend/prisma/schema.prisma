@@ -239,6 +239,9 @@ model Claim {
   reissuedFrom   Claim?    @relation("ReissueChain", fields: [reissuedFromId], references: [id])
   reissuedTo     Claim[]   @relation("ReissueChain")
 
+  /// Stores AI verification anchor metadata (campaign_ref, claim_id, package_id)
+  anchorMetadata Json?
+
   balanceLedger     BalanceLedger[]
   sorobanTransactions SorobanTransaction[]
   sorobanEventCorrelations SorobanEventCorrelation[]
