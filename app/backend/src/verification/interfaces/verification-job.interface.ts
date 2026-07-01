@@ -1,9 +1,16 @@
 import { ContractAwareMetadata } from '../dto/verification-result.dto';
 
+export interface AnchorMetadata {
+  campaignRef?: string | null;
+  claimId?: string | null;
+  packageId?: string | null;
+}
+
 export interface VerificationJobData {
   claimId: string;
   timestamp: number;
   correlationId?: string;
+  anchorMetadata?: AnchorMetadata; 
 }
 
 export interface VerificationResult {
