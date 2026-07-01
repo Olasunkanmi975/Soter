@@ -1,7 +1,10 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
-import { ContractAwareMetadata, VerificationResultDto } from './dto/verification-result.dto';
+import {
+  ContractAwareMetadata,
+  VerificationResultDto,
+} from './dto/verification-result.dto';
 import { DeploymentMetadataService } from '../deployment-metadata/deployment-metadata.service';
 import { DeploymentMetadataResponseDto } from '../deployment-metadata/dto/deployment-metadata.dto';
 
@@ -15,7 +18,8 @@ export class VerificationMetadataService {
     private readonly configService: ConfigService,
     private readonly deploymentMetadataService: DeploymentMetadataService,
   ) {
-    this.network = this.configService.get<string>('STELLAR_NETWORK') || 'testnet';
+    this.network =
+      this.configService.get<string>('STELLAR_NETWORK') || 'testnet';
   }
 
   /**
@@ -31,13 +35,15 @@ export class VerificationMetadataService {
       try {
         // Use the actual method available in DeploymentMetadataService
         const network = this.network;
-        const allDeployments = await this.deploymentMetadataService.findByNetwork(network);
-        
+        const allDeployments =
+          await this.deploymentMetadataService.findByNetwork(network);
+
         if (allDeployments && allDeployments.length > 0) {
           // Try to find a deployment with matching contract name
           // Use 'aid_escrow' as the default contract name
           const aidEscrowDeployment = allDeployments.find(
-            (d: DeploymentMetadataResponseDto) => d.contractName === 'aid_escrow'
+            (d: DeploymentMetadataResponseDto) =>
+              d.contractName === 'aid_escrow',
           );
           if (aidEscrowDeployment) {
             deploymentMetadata = aidEscrowDeployment;
@@ -47,7 +53,9 @@ export class VerificationMetadataService {
           }
         }
       } catch (error) {
-        this.logger.warn(`Failed to fetch deployment metadata for network ${this.network}: ${error}`);
+        this.logger.warn(
+          `Failed to fetch deployment metadata for network ${this.network}: ${error}`,
+        );
         // Continue without deployment metadata
       }
 
@@ -66,7 +74,7 @@ export class VerificationMetadataService {
       // Build metadata with stable identifiers
       // Use type assertion for fields that may exist on the claim but not in the Prisma type
       const claimAny = claim as any;
-      
+
       // Get package ID from various sources
       let packageId: string;
       if (claimAny.packageId) {
@@ -83,8 +91,11 @@ export class VerificationMetadataService {
         claimId,
         packageId,
         network: this.network,
-        chainId: this.configService.get<string>('STELLAR_CHAIN_ID') || 'testnet',
-        version: deploymentMetadata?.commitSha ? `v${deploymentMetadata.commitSha.substring(0, 8)}` : '1.0.0',
+        chainId:
+          this.configService.get<string>('STELLAR_CHAIN_ID') || 'testnet',
+        version: deploymentMetadata?.commitSha
+          ? `v${deploymentMetadata.commitSha.substring(0, 8)}`
+          : '1.0.0',
         timestamp: new Date(),
       };
 
@@ -107,15 +118,18 @@ export class VerificationMetadataService {
 
       return metadata;
     } catch (error) {
-      this.logger.error(`Failed to generate metadata for claim ${claimId}: ${error}`);
-      
+      this.logger.error(
+        `Failed to generate metadata for claim ${claimId}: ${error}`,
+      );
+
       // Return minimal valid metadata even on error
       return {
         campaignId,
         claimId,
         packageId: this.generatePackageId(claimId),
         network: this.network,
-        chainId: this.configService.get<string>('STELLAR_CHAIN_ID') || 'testnet',
+        chainId:
+          this.configService.get<string>('STELLAR_CHAIN_ID') || 'testnet',
         timestamp: new Date(),
       };
     }
@@ -141,11 +155,17 @@ export class VerificationMetadataService {
 
     if (!metadata.packageId) {
       errors.push('packageId is required');
-    } else if (typeof metadata.packageId !== 'string' || metadata.packageId.length < 3) {
+    } else if (
+      typeof metadata.packageId !== 'string' ||
+      metadata.packageId.length < 3
+    ) {
       errors.push('packageId must be a valid string with minimum length 3');
     }
 
-    if (metadata.network && !['testnet', 'mainnet', 'public'].includes(metadata.network)) {
+    if (
+      metadata.network &&
+      !['testnet', 'mainnet', 'public'].includes(metadata.network)
+    ) {
       errors.push('network must be one of: testnet, mainnet, public');
     }
 
@@ -186,7 +206,8 @@ export class VerificationMetadataService {
             ? [`Metadata validation warnings: ${validationErrors.join(', ')}`]
             : []),
         ],
-        validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+        validationErrors:
+          validationErrors.length > 0 ? validationErrors : undefined,
       };
 
       this.logger.log(
@@ -196,8 +217,10 @@ export class VerificationMetadataService {
 
       return enhancedResult;
     } catch (error) {
-      this.logger.error(`Failed to enhance result with metadata for claim ${claimId}: ${error}`);
-      
+      this.logger.error(
+        `Failed to enhance result with metadata for claim ${claimId}: ${error}`,
+      );
+
       // Return the original result without metadata enhancement
       return {
         ...result,
@@ -241,13 +264,24 @@ export class VerificationMetadataService {
       if (typeof payload.result !== 'object') {
         errors.push('result must be an object');
       } else {
-        if (typeof payload.result.score !== 'number' || payload.result.score < 0 || payload.result.score > 1) {
+        if (
+          typeof payload.result.score !== 'number' ||
+          payload.result.score < 0 ||
+          payload.result.score > 1
+        ) {
           errors.push('result.score must be a number between 0 and 1');
         }
-        if (typeof payload.result.confidence !== 'number' || payload.result.confidence < 0 || payload.result.confidence > 1) {
+        if (
+          typeof payload.result.confidence !== 'number' ||
+          payload.result.confidence < 0 ||
+          payload.result.confidence > 1
+        ) {
           errors.push('result.confidence must be a number between 0 and 1');
         }
-        if (payload.result.details && typeof payload.result.details !== 'object') {
+        if (
+          payload.result.details &&
+          typeof payload.result.details !== 'object'
+        ) {
           errors.push('result.details must be an object');
         }
       }
@@ -256,7 +290,10 @@ export class VerificationMetadataService {
     }
 
     // Validate network if present
-    if (payload.network && !['testnet', 'mainnet', 'public'].includes(payload.network)) {
+    if (
+      payload.network &&
+      !['testnet', 'mainnet', 'public'].includes(payload.network)
+    ) {
       errors.push('network must be one of: testnet, mainnet, public');
     }
 
@@ -267,7 +304,8 @@ export class VerificationMetadataService {
    * Check if a string is a valid UUID
    */
   private isValidUUID(uuid: string): boolean {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return uuidRegex.test(uuid);
   }
 
@@ -285,7 +323,9 @@ export class VerificationMetadataService {
   /**
    * Extract metadata from a webhook payload
    */
-  extractMetadataFromPayload(payload: any): Partial<ContractAwareMetadata> | null {
+  extractMetadataFromPayload(
+    payload: any,
+  ): Partial<ContractAwareMetadata> | null {
     if (!payload || typeof payload !== 'object') {
       return null;
     }
@@ -321,40 +361,51 @@ export class VerificationMetadataService {
     return Object.keys(metadata).length > 0 ? metadata : null;
   }
 
-/**
- * Merge metadata from multiple sources with priority order
- */
-mergeMetadata(
-  ...sources: (Partial<ContractAwareMetadata> | null | undefined)[]
-): Partial<ContractAwareMetadata> {
-  const result: Partial<ContractAwareMetadata> = {};
+  /**
+   * Merge metadata from multiple sources with priority order
+   */
+  mergeMetadata(
+    ...sources: (Partial<ContractAwareMetadata> | null | undefined)[]
+  ): Partial<ContractAwareMetadata> {
+    const result: Partial<ContractAwareMetadata> = {};
 
-  for (const source of sources) {
-    if (source) {
-      // Only set fields that are not already set (first source wins)
-      for (const key of Object.keys(source) as (keyof ContractAwareMetadata)[]) {
-        if (!(key in result) && source[key] !== undefined && source[key] !== null) {
-          // Type-safe assignment with explicit type handling
-          switch (key) {
-            case 'timestamp':
-              // Handle Date conversion
-              const timestamp = source[key];
-              if (timestamp instanceof Date || typeof timestamp === 'string') {
-                result[key] = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    for (const source of sources) {
+      if (source) {
+        // Only set fields that are not already set (first source wins)
+        for (const key of Object.keys(
+          source,
+        ) as (keyof ContractAwareMetadata)[]) {
+          if (
+            !(key in result) &&
+            source[key] !== undefined &&
+            source[key] !== null
+          ) {
+            // Type-safe assignment with explicit type handling
+            switch (key) {
+              case 'timestamp': {
+                // Handle Date conversion - wrapped in braces
+                const timestamp = source[key];
+                if (
+                  timestamp instanceof Date ||
+                  typeof timestamp === 'string'
+                ) {
+                  result[key] =
+                    timestamp instanceof Date ? timestamp : new Date(timestamp);
+                }
+                break;
               }
-              break;
-            default:
-              // For all other fields, use type assertion
-              result[key] = source[key];
-              break;
+              default:
+                // For all other fields, use type assertion
+                result[key] = source[key];
+                break;
+            }
           }
         }
       }
     }
-  }
 
-  return result;
-}
+    return result;
+  }
 
   /**
    * Normalize network name to standard format
@@ -373,7 +424,9 @@ mergeMetadata(
   /**
    * Check if metadata is complete (all required fields present)
    */
-  isMetadataComplete(metadata: ContractAwareMetadata | Partial<ContractAwareMetadata>): boolean {
+  isMetadataComplete(
+    metadata: ContractAwareMetadata | Partial<ContractAwareMetadata>,
+  ): boolean {
     return !!(
       metadata &&
       metadata.campaignId &&

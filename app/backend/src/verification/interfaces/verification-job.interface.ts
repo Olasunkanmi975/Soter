@@ -10,7 +10,7 @@ export interface VerificationJobData {
   claimId: string;
   timestamp: number;
   correlationId?: string;
-  anchorMetadata?: AnchorMetadata; 
+  anchorMetadata?: AnchorMetadata;
 }
 
 export interface VerificationResult {

@@ -403,7 +403,7 @@ describe('AidEscrow Integration Tests', () => {
       };
 
       const req = createMockRequest(
-        'GOPER8TORADDRESS00000000000000000000000000000000000000'
+        'GOPER8TORADDRESS00000000000000000000000000000000000000',
       );
       const result = await controller.createAidPackage(dto, req);
 
@@ -424,7 +424,7 @@ describe('AidEscrow Integration Tests', () => {
       };
 
       const req = createMockRequest(
-        'GOPER8TORADDRESS00000000000000000000000000000000000000'
+        'GOPER8TORADDRESS00000000000000000000000000000000000000',
       );
       const result = await controller.dryRunAidPackageIssuance(dto, req);
 
@@ -447,7 +447,7 @@ describe('AidEscrow Integration Tests', () => {
       };
 
       const req = createMockRequest(
-        'GOPER8TORADDRESS00000000000000000000000000000000000000'
+        'GOPER8TORADDRESS00000000000000000000000000000000000000',
       );
       const result = await controller.batchCreateAidPackages(dto, req);
 
@@ -458,7 +458,7 @@ describe('AidEscrow Integration Tests', () => {
 
     it('should handle POST /packages/:id/claim', async () => {
       const req = createMockRequest(
-        'GBUQWP3BOUZX34ULNQG23RQ6F4BFXWBTRSE53XSTE23JMCVOCJGXVSVZ'
+        'GBUQWP3BOUZX34ULNQG23RQ6F4BFXWBTRSE53XSTE23JMCVOCJGXVSVZ',
       );
       const result = await controller.claimAidPackage('pkg-001', req);
 
@@ -484,12 +484,12 @@ describe('AidEscrow Integration Tests', () => {
     });
 
     it('should throw error when claiming without recipient address', async () => {
-      const req = createMockRequest('') as any;
+      const req = createMockRequest('');
       req.user = undefined;
 
-      await expect(
-        controller.claimAidPackage('pkg-001', req),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.claimAidPackage('pkg-001', req)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -506,7 +506,7 @@ describe('AidEscrow Integration Tests', () => {
       };
 
       const req = createMockRequest(
-        'GOPER8TORADDRESS00000000000000000000000000000000000000'
+        'GOPER8TORADDRESS00000000000000000000000000000000000000',
       );
 
       await expect(

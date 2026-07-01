@@ -18,7 +18,9 @@ describe('Verification Metadata E2E', () => {
 
     app = moduleFixture.createNestApplication();
     prisma = moduleFixture.get<PrismaService>(PrismaService);
-    metadataService = moduleFixture.get<VerificationMetadataService>(VerificationMetadataService);
+    metadataService = moduleFixture.get<VerificationMetadataService>(
+      VerificationMetadataService,
+    );
 
     await app.init();
   });
@@ -40,8 +42,8 @@ describe('Verification Metadata E2E', () => {
           status: CampaignStatus.active,
           budget: 10000, // Required field
           organization: {
-            connect: { id: 'org_123' }
-          }
+            connect: { id: 'org_123' },
+          },
         },
       });
 
@@ -57,7 +59,10 @@ describe('Verification Metadata E2E', () => {
         },
       });
 
-      const metadata = await metadataService.generateMetadata(claimId, campaignId);
+      const metadata = await metadataService.generateMetadata(
+        claimId,
+        campaignId,
+      );
 
       expect(metadata).toBeDefined();
       expect(metadata.campaignId).toBe(campaignId);
@@ -109,7 +114,8 @@ describe('Verification Metadata E2E', () => {
         },
       };
 
-      const { isValid, errors } = metadataService.validateWebhookPayload(validPayload);
+      const { isValid, errors } =
+        metadataService.validateWebhookPayload(validPayload);
       expect(isValid).toBe(true);
       expect(errors).toHaveLength(0);
     });
@@ -124,7 +130,8 @@ describe('Verification Metadata E2E', () => {
         },
       };
 
-      const { isValid, errors } = metadataService.validateWebhookPayload(invalidPayload);
+      const { isValid, errors } =
+        metadataService.validateWebhookPayload(invalidPayload);
       expect(isValid).toBe(false);
       expect(errors).toContain('Missing required field: campaignId');
       expect(errors).toContain('Missing required field: packageId');
@@ -141,7 +148,8 @@ describe('Verification Metadata E2E', () => {
         },
       };
 
-      const { isValid, errors } = metadataService.validateWebhookPayload(invalidPayload);
+      const { isValid, errors } =
+        metadataService.validateWebhookPayload(invalidPayload);
       expect(isValid).toBe(false);
       expect(errors.some(e => e.includes('claimId'))).toBe(true);
       expect(errors.some(e => e.includes('campaignId'))).toBe(true);
@@ -185,28 +193,32 @@ describe('Verification Metadata E2E', () => {
       const campaignId = '223e4567-e89b-12d3-a456-426614174000';
       const claimId = '223e4567-e89b-12d3-a456-426614174001';
 
-      await prisma.campaign.create({
-        data: {
-          id: campaignId,
-          name: 'Test Campaign 2',
-          status: CampaignStatus.active,
-          budget: 10000, // Required field
-          organization: {
-            connect: { id: 'org_123' }
-          }
-        },
-      }).catch(() => {}); // Ignore if already exists
+      await prisma.campaign
+        .create({
+          data: {
+            id: campaignId,
+            name: 'Test Campaign 2',
+            status: CampaignStatus.active,
+            budget: 10000, // Required field
+            organization: {
+              connect: { id: 'org_123' },
+            },
+          },
+        })
+        .catch(() => {}); // Ignore if already exists
 
-      await prisma.claim.create({
-        data: {
-          id: claimId,
-          campaignId,
-          status: ClaimStatus.requested,
-          amount: 100,
-          recipientRef: 'recipient_456',
-          // packageId removed
-        },
-      }).catch(() => {}); // Ignore if already exists
+      await prisma.claim
+        .create({
+          data: {
+            id: claimId,
+            campaignId,
+            status: ClaimStatus.requested,
+            amount: 100,
+            recipientRef: 'recipient_456',
+            // packageId removed
+          },
+        })
+        .catch(() => {}); // Ignore if already exists
 
       const payload = {
         claimId: claimId,
