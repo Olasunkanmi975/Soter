@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,6 +26,9 @@ import { firstValueFrom } from 'rxjs';
 import OpenAI from 'openai';
 import * as crypto from 'crypto';
 import { CircuitBreaker } from '../common/utils/circuit-breaker.util';
+import { VerificationMetadataService } from './metadata.service';
+import { VerificationResultDto } from './dto/verification-result.dto';
+import { CorrelationPropagationUtil } from '../common/utils/correlation-propagation.util';
 
 // ---------------------------------------------------------------------------
 // OCR service types
@@ -139,7 +143,8 @@ export class VerificationService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly httpService: HttpService,
-    private readonly webhookService: WebhookService,
+    private readonly verificationMetadataService: VerificationMetadataService,
+    private readonly correlationUtil: CorrelationPropagationUtil,
   ) {
     this.verificationMode =
       this.configService.get<string>('VERIFICATION_MODE') || 'mock';
@@ -283,7 +288,14 @@ export class VerificationService {
       result = await this.performAIVerification(claim);
     }
 
-    const shouldVerify = result.score >= this.verificationThreshold;
+    // ENHANCED: Add contract-aware metadata to result
+    const enhancedResult = await this.enhanceResultWithMetadata(
+      result,
+      claimId,
+      claim.campaignId,
+    );
+
+    const shouldVerify = enhancedResult.score >= this.verificationThreshold;
 
     // Build anchor metadata to persist
     const anchorMetadataToPersist = anchorMetadata
@@ -294,19 +306,21 @@ export class VerificationService {
         }
       : null;
 
+    // Update claim with verification result including metadata
     await this.prisma.claim.update({
       where: { id: claimId },
       data: {
         status: shouldVerify ? 'verified' : 'requested',
-        anchorMetadata: anchorMetadataToPersist === null
-          ? Prisma.JsonNull
-          : (anchorMetadataToPersist as Prisma.InputJsonValue),
+        anchorMetadata:
+          anchorMetadataToPersist === null
+            ? Prisma.JsonNull
+            : (anchorMetadataToPersist as Prisma.InputJsonValue),
       },
     });
 
     this.logger.log(
-      `Claim ${claimId} verification completed – score ${result.score} ` +
-        `(threshold: ${this.verificationThreshold})`,
+      `Claim ${claimId} verification completed – score ${enhancedResult.score} ` +
+        `(threshold: ${this.verificationThreshold}, packageId: ${enhancedResult.metadata?.packageId})`,
     );
 
     await this.auditService.record({
@@ -315,25 +329,15 @@ export class VerificationService {
       entityId: claimId,
       action: 'complete',
       metadata: {
-        score: result.score,
+        score: enhancedResult.score,
         status: shouldVerify ? 'verified' : 'requested',
+        packageId: enhancedResult.metadata?.packageId,
+        network: enhancedResult.metadata?.network,
         anchorMetadata: anchorMetadataToPersist,
       },
     });
 
-    try {
-      await this.webhookService.enqueueWebhook(
-        claimId,
-        shouldVerify ? 'verified' : 'requested',
-        result,
-      );
-    } catch (err) {
-      this.logger.error(
-        `Failed to enqueue webhook for claim ${claimId}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-
-    return result;
+    return enhancedResult;
   }
 
   // -------------------------------------------------------------------------
@@ -606,6 +610,16 @@ the JSON verdict.
 
   private async callOCRService(documentUrl: string): Promise<OCRResponse> {
     try {
+      // Get correlation ID and propagate to OCR service
+      const correlationId = this.correlationUtil.getCurrentCorrelationId();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (correlationId) {
+        headers['x-correlation-id'] = correlationId;
+      }
+
       const response = await this.ocrCircuitBreaker.fire(() =>
         firstValueFrom(
           this.httpService.post(
@@ -613,7 +627,7 @@ the JSON verdict.
             { document_url: documentUrl },
             {
               timeout: this.aiServiceTimeout,
-              headers: { 'Content-Type': 'application/json' },
+              headers,
             },
           ),
         ),
@@ -640,6 +654,10 @@ the JSON verdict.
       }
     }
   }
+
+  // private getCorrelationIdForOutbound(): string | null {
+  //   return this.correlationUtil.getCurrentCorrelationId();
+  // }
 
   // -------------------------------------------------------------------------
   // Result builders
@@ -681,6 +699,48 @@ the JSON verdict.
       },
       processedAt: new Date(),
     };
+  }
+
+  /**
+   * Enhances a verification result with contract-aware metadata
+   */
+  private async enhanceResultWithMetadata(
+    result: VerificationResult,
+    claimId: string,
+    campaignId: string,
+  ): Promise<VerificationResult> {
+    // Convert to DTO first
+    const resultDto: VerificationResultDto = {
+      score: result.score,
+      confidence: result.confidence,
+      details: result.details,
+      processedAt: result.processedAt || new Date(),
+    };
+
+    // Enhance with contract-aware metadata
+    const enhanced = await this.verificationMetadataService.enhanceWithMetadata(
+      resultDto,
+      claimId,
+      campaignId,
+    );
+
+    // Log warnings if any
+    if (enhanced.warnings && enhanced.warnings.length > 0) {
+      this.logger.warn(
+        `Metadata warnings for claim ${claimId}: ${enhanced.warnings.join(', ')}`,
+      );
+    }
+
+    return {
+      score: enhanced.score,
+      confidence: enhanced.confidence,
+      details: enhanced.details,
+      processedAt: enhanced.processedAt,
+      // Add metadata to result
+      metadata: enhanced.metadata,
+      warnings: enhanced.warnings,
+      validationErrors: enhanced.validationErrors,
+    } as VerificationResult;
   }
 
   /** Heuristic: treat strings that start with http/https as URLs. */

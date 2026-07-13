@@ -8,15 +8,14 @@ import { VerificationFlowService } from './verification-flow.service';
 import { VerificationProcessor } from './verification.processor';
 import { VerificationInboxController } from './verification-inbox.controller';
 import { VerificationInboxService } from './verification-inbox.service';
+import { EnhancedVerificationFlowService } from './enhanced-verification-flow.service';
+import { VerificationMetadataService } from './metadata.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EncryptionModule } from '../common/encryption/encryption.module';
 import { JobsModule } from '../jobs/jobs.module';
-import { HmacModule } from '../common/hmac/hmac.module';
-import { WebhookService } from './webhook.service';
-import { WebhookProcessor } from './webhook.processor';
-import { MetricsModule } from '../observability/metrics/metrics.module';
+import { DeploymentMetadataModule } from '../deployment-metadata/deployment-metadata.module';
 
 @Module({
   imports: [
@@ -51,6 +50,7 @@ import { MetricsModule } from '../observability/metrics/metrics.module';
       inject: [ConfigService],
     }),
     JobsModule,
+    DeploymentMetadataModule, // Added for contract-aware metadata
   ],
   controllers: [VerificationController, VerificationInboxController],
   providers: [
@@ -58,14 +58,14 @@ import { MetricsModule } from '../observability/metrics/metrics.module';
     VerificationFlowService,
     VerificationProcessor,
     VerificationInboxService,
-    WebhookService,
-    WebhookProcessor,
+    EnhancedVerificationFlowService, // Added enhanced flow service
+    VerificationMetadataService, // Added metadata service
   ],
   exports: [
     VerificationService,
     VerificationFlowService,
     VerificationInboxService,
-    WebhookService,
+    VerificationMetadataService, // Export for use in other modules
   ],
 })
 export class VerificationModule {}
