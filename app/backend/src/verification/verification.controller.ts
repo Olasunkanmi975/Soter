@@ -139,7 +139,7 @@ export class VerificationController {
   @ApiUnauthorizedResponse({
     description: 'Invalid or missing API key.',
   })
-  async getMetrics() {
+  getMetrics() {
     return this.verificationService.getQueueMetrics();
   }
 
@@ -323,7 +323,7 @@ export class VerificationController {
   @ApiBadRequestResponse({
     description: 'Invalid filter values or pagination parameters.',
   })
-  async getReviewQueue(@Query() query: ReviewQueueQueryDto) {
+  getReviewQueue(@Query() query: ReviewQueueQueryDto) {
     return this.verificationService.getReviewQueue(query);
   }
 
