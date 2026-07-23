@@ -38,7 +38,7 @@ pub struct DelegateHistory {
     pub new_delegate: Address,
     pub changed_by: Address,
     pub changed_at: u64,
-    pub reason: String,
+    pub reason: Symbol,
 }
 
 /// Loads the full delegate map from persistent storage.
@@ -116,7 +116,7 @@ fn record_delegate_change(
     previous_delegate: Option<Address>,
     new_delegate: &Address,
     changed_by: &Address,
-    reason: &str,
+    reason: Symbol,
 ) {
     let mut history = load_delegate_history(env);
     let record = DelegateHistory {
@@ -125,7 +125,7 @@ fn record_delegate_change(
         new_delegate: new_delegate.clone(),
         changed_by: changed_by.clone(),
         changed_at: env.ledger().timestamp(),
-        reason: reason.to_string(),
+        reason,
     };
     history.push_back(record);
     save_delegate_history(env, &history);
@@ -137,16 +137,16 @@ fn record_delegate_change_system(
     package_id: u64,
     previous_delegate: Option<Address>,
     new_delegate: &Address,
-    reason: &str,
+    reason: Symbol,
 ) {
     let mut history = load_delegate_history(env);
     let record = DelegateHistory {
         package_id,
         previous_delegate,
         new_delegate: new_delegate.clone(),
-        changed_by: Address::generate(env), // System-generated placeholder
+        changed_by: env.current_contract_address(),
         changed_at: env.ledger().timestamp(),
-        reason: reason.to_string(),
+        reason,
     };
     history.push_back(record);
     save_delegate_history(env, &history);
@@ -195,7 +195,7 @@ pub fn set_delegate(
         previous_delegate,
         delegate,
         admin,
-        "Admin delegate assignment",
+        Symbol::new(env, "delegate_set"),
     );
 
     Ok(())
@@ -307,10 +307,10 @@ pub fn get_authorization_info(
     package_id: u64,
     primary_recipient: &Address,
     claimer: &Address,
-) -> (bool, Option<String>) {
+) -> (bool, Option<Symbol>) {
     // Check if claimer is primary recipient
     if claimer == primary_recipient {
-        return (true, Some("Primary recipient".to_string()));
+        return (true, Some(Symbol::new(env, "Primary recipient")));
     }
 
     // Check delegate status
@@ -320,18 +320,18 @@ pub fn get_authorization_info(
             if &delegate == claimer {
                 if let Some(expiry) = expires_at {
                     if expiry > env.ledger().timestamp() {
-                        (true, Some(format!("Delegate (expires at {})", expiry)))
+                        (true, Some(Symbol::new(env, "Delegate (with expiry)")))
                     } else {
-                        (false, Some("Delegate expired".to_string()))
+                        (false, Some(Symbol::new(env, "Delegate expired")))
                     }
                 } else {
-                    (true, Some("Delegate (no expiration)".to_string()))
+                    (true, Some(Symbol::new(env, "Delegate (no expiration)")))
                 }
             } else {
-                (false, Some("Not the registered delegate".to_string()))
+                (false, Some(Symbol::new(env, "Not the registered delegate")))
             }
         }
-        None => (false, Some("No delegate registered".to_string())),
+        None => (false, Some(Symbol::new(env, "No delegate registered"))),
     }
 }
 
@@ -355,8 +355,8 @@ pub fn clear_delegate(env: &Env, package_id: u64) {
             env,
             package_id,
             Some(delegate),
-            &Address::generate(env),
-            "Delegate cleared after claim",
+            &env.current_contract_address(),
+            Symbol::new(env, "delegate_cleared"),
         );
     }
 }
@@ -557,17 +557,17 @@ mod tests {
         // Primary recipient
         let (authorized, reason) = get_authorization_info(&env, 1, &recipient, &recipient);
         assert!(authorized);
-        assert_eq!(reason, Some("Primary recipient".to_string()));
+        assert_eq!(reason, Some(Symbol::new(&env, "Primary recipient")));
 
         // Delegate
         let (authorized, reason) = get_authorization_info(&env, 1, &recipient, &delegate);
         assert!(authorized);
-        assert!(reason.unwrap().contains("Delegate"));
+        assert_eq!(reason, Some(Symbol::new(&env, "Delegate (with expiry)")));
 
         // Stranger
         let (authorized, reason) = get_authorization_info(&env, 1, &recipient, &stranger);
         assert!(!authorized);
-        assert_eq!(reason, Some("No delegate registered".to_string()));
+        assert_eq!(reason, Some(Symbol::new(&env, "No delegate registered")));
     }
 
     #[test]
