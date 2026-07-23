@@ -140,6 +140,15 @@ pub struct PackageClaimed {
 }
 
 #[contractevent]
+pub struct PackageClaimedByRelayer {
+    pub package_id: u64,
+    pub recipient: Address,
+    pub relayer: Address,
+    pub amount: i128,
+    pub timestamp: u64,
+}
+
+#[contractevent]
 pub struct PackageDisbursed {
     pub package_id: u64,
     pub recipient: Address,
@@ -845,6 +854,90 @@ impl AidEscrow {
                 Self::finalize_claim(&env, &key, &mut package, id, &claimant, now)
             }
         }
+    }
+
+    /// Claim a package through a relayer who pays the transaction costs.
+    ///
+    /// The `claimant` must be the package recipient or an authorized delegate.
+    /// Both the `claimant` and the `relayer` must have signed the transaction.
+    /// The relayer's address is recorded in the event for off-chain identification.
+    ///
+    /// Merkle-allowlist packages cannot be claimed through this path; use
+    /// `claim_with_proof` instead.
+    pub fn claim_with_relayer(
+        env: Env,
+        id: u64,
+        claimant: Address,
+        relayer: Address,
+    ) -> Result<(), Error> {
+        Self::check_action_paused(&env, symbol_short!("claim"))?;
+        let key = (symbol_short!("pkg"), id);
+        let mut package: Package = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(Error::PackageNotFound)?;
+
+        if package.status != PackageStatus::Created {
+            return Err(Error::PackageNotActive);
+        }
+
+        let now = env.ledger().timestamp();
+        if now < package.claim_starts_at {
+            return Err(Error::ClaimTooEarly);
+        }
+
+        if package.expires_at > 0 && now > package.expires_at {
+            return Err(Error::PackageExpired);
+        }
+
+        if Self::merkle_root_from_metadata(&env, &package.metadata).is_some() {
+            return Err(Error::InvalidProof);
+        }
+
+        if !delegate::is_authorised_claimer(&env, id, &package.recipient, &claimant) {
+            return Err(Error::NotAuthorized);
+        }
+
+        claimant.require_auth();
+        relayer.require_auth();
+
+        delegate::clear_delegate(&env, id);
+
+        Self::transfer_token(
+            &env,
+            &package.token,
+            &env.current_contract_address(),
+            &claimant,
+            &package.amount,
+        )?;
+
+        package.status = PackageStatus::Claimed;
+        env.storage().persistent().set(&key, &package);
+
+        Self::decrement_locked(&env, &package.token, package.amount);
+
+        let mut claimed_map: Map<Address, i128> = env
+            .storage()
+            .instance()
+            .get(&KEY_TOTAL_CLAIMED)
+            .unwrap_or(Map::new(&env));
+        let current_total = claimed_map.get(package.token.clone()).unwrap_or(0);
+        claimed_map.set(package.token.clone(), current_total + package.amount);
+        env.storage()
+            .instance()
+            .set(&KEY_TOTAL_CLAIMED, &claimed_map);
+
+        PackageClaimedByRelayer {
+            package_id: id,
+            recipient: claimant.clone(),
+            relayer,
+            amount: package.amount,
+            timestamp: now,
+        }
+        .publish(&env);
+
+        Ok(())
     }
 
     // --- Admin Actions ---
