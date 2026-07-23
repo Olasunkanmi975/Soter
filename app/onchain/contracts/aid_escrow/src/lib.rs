@@ -1627,10 +1627,7 @@ impl AidEscrow {
     }
 
     /// Returns the delegate and optional expiration for a package.
-    pub fn get_delegate_info(
-        env: Env,
-        package_id: u64,
-    ) -> Option<(Address, Option<u64>)> {
+    pub fn get_delegate_info(env: Env, package_id: u64) -> Option<(Address, Option<u64>)> {
         delegate::get_delegate_info(&env, package_id)
     }
 
