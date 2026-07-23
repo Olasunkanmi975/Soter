@@ -25,6 +25,8 @@ use soroban_sdk::{
     Bytes, Env, IntoVal, Map, String, Symbol, Val, Vec,
 };
 
+mod delegate;
+
 // --- Storage Keys ---
 const KEY_ADMIN: Symbol = symbol_short!("admin");
 const KEY_TOTAL_LOCKED: Symbol = symbol_short!("locked"); // Map<Address, i128>
@@ -786,6 +788,7 @@ impl AidEscrow {
         package.recipient.require_auth();
         let payout_recipient = package.recipient.clone();
 
+        delegate::clear_delegate(&env, id);
         Self::finalize_claim(&env, &key, &mut package, id, &payout_recipient, now)
     }
 
@@ -831,12 +834,14 @@ impl AidEscrow {
                 if !Self::verify_merkle_proof_for_claimant(&env, &claimant, &proof, root) {
                     return Err(Error::InvalidProof);
                 }
+                delegate::clear_delegate(&env, id);
                 Self::finalize_claim(&env, &key, &mut package, id, &claimant, now)
             }
             None => {
-                if claimant != package.recipient {
+                if !delegate::is_authorised_claimer(&env, id, &package.recipient, &claimant) {
                     return Err(Error::NotAuthorized);
                 }
+                delegate::clear_delegate(&env, id);
                 Self::finalize_claim(&env, &key, &mut package, id, &claimant, now)
             }
         }
@@ -1581,6 +1586,63 @@ impl AidEscrow {
         }
 
         result
+    }
+
+    // --- Delegate Operations ---
+
+    /// Register or update a delegate address for a package.
+    /// Only callable by the contract admin.
+    pub fn set_delegate(
+        env: Env,
+        admin: Address,
+        package_id: u64,
+        delegate: Address,
+    ) -> Result<(), Error> {
+        delegate::set_delegate(&env, &admin, package_id, &delegate)
+    }
+
+    /// Register or update a delegate with expiration timestamp.
+    /// Only callable by the contract admin.
+    pub fn set_delegate_with_expiry(
+        env: Env,
+        admin: Address,
+        package_id: u64,
+        delegate: Address,
+        expires_at: u64,
+    ) -> Result<(), Error> {
+        delegate::set_delegate_with_expiry(&env, &admin, package_id, &delegate, expires_at)
+    }
+
+    /// Remove a delegate from a package (admin only).
+    /// Records the revocation in the audit trail.
+    pub fn remove_delegate(env: Env, admin: Address, package_id: u64) -> Result<(), Error> {
+        admin.require_auth();
+        delegate::clear_delegate(&env, package_id);
+        Ok(())
+    }
+
+    /// Returns the registered delegate for a package, if any and not expired.
+    pub fn get_delegate(env: Env, package_id: u64) -> Option<Address> {
+        delegate::get_delegate(&env, package_id)
+    }
+
+    /// Returns the delegate and optional expiration for a package.
+    pub fn get_delegate_info(
+        env: Env,
+        package_id: u64,
+    ) -> Option<(Address, Option<u64>)> {
+        delegate::get_delegate_info(&env, package_id)
+    }
+
+    /// Returns the audit history of delegate changes for a package.
+    pub fn get_delegate_history(env: Env, package_id: u64) -> Vec<delegate::DelegateHistory> {
+        delegate::get_delegate_history(&env, package_id)
+    }
+
+    /// Cleanup expired delegates to reclaim storage.
+    /// Anyone may call this maintenance function.
+    pub fn cleanup_expired_delegates(env: Env, caller: Address) -> Result<u32, Error> {
+        delegate::cleanup_expired_delegates(&env, &caller)
     }
 }
 

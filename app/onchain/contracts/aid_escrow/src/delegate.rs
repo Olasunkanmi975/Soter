@@ -97,7 +97,7 @@ fn validate_package_state(env: &Env, package_id: u64) -> Result<(), Error> {
         return Err(Error::PackageNotFound);
     }
 
-    let package: crate::AidPackage = env.storage()
+    let package: crate::Package = env.storage()
         .persistent()
         .get(&package_key)
         .unwrap();
@@ -176,7 +176,7 @@ pub fn set_delegate(
 
     // Get package to validate delegate is not the recipient
     let package_key = (symbol_short!("pkg"), package_id);
-    let package: crate::AidPackage = env.storage()
+    let package: crate::Package = env.storage()
         .persistent()
         .get(&package_key)
         .unwrap();
@@ -401,16 +401,18 @@ pub fn cleanup_expired_delegates(env: &Env, caller: &Address) -> Result<u32, Err
 mod tests {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env};
-    use crate::{AidPackage, PackageStatus};
+    use crate::{Package, PackageStatus};
 
     fn create_test_package(env: &Env, package_id: u64, recipient: &Address, status: PackageStatus) {
-        let package = AidPackage {
+        let package = Package {
+            id: package_id,
             recipient: recipient.clone(),
             amount: 1000,
             token: Address::generate(env),
             status,
             created_at: env.ledger().timestamp(),
             expires_at: 0,
+            claim_starts_at: 0,
             metadata: soroban_sdk::Map::new(env),
         };
         env.storage().persistent().set(&(symbol_short!("pkg"), package_id), &package);
