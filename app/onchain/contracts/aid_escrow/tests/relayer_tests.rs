@@ -8,7 +8,6 @@ use soroban_sdk::{
     Address, Bytes, Env, Map, Symbol, Vec,
 };
 
-
 const UNIT: i128 = 10_000_000;
 
 fn setup_env() -> Env {
@@ -72,14 +71,28 @@ impl RelayerTest {
 
     fn create_package(&self, id: u64) {
         let metadata = Map::new(&self.env);
-        self.client
-            .create_package(&self.admin, &id, &self.recipient, &UNIT, &self.token, &86400, &metadata);
+        self.client.create_package(
+            &self.admin,
+            &id,
+            &self.recipient,
+            &UNIT,
+            &self.token,
+            &86400,
+            &metadata,
+        );
     }
 
     fn create_expiring_package(&self, id: u64, ttl: u64) {
         let metadata = Map::new(&self.env);
-        self.client
-            .create_package(&self.admin, &id, &self.recipient, &UNIT, &self.token, &ttl, &metadata);
+        self.client.create_package(
+            &self.admin,
+            &id,
+            &self.recipient,
+            &UNIT,
+            &self.token,
+            &ttl,
+            &metadata,
+        );
     }
 
     fn advance_time(&self, seconds: u64) {
@@ -104,8 +117,7 @@ fn relayed_claim_succeeds() {
 
     assert_eq!(t.balance_of(&t.recipient), 0);
 
-    t.client
-        .claim_with_relayer(&1, &t.recipient, &t.relayer);
+    t.client.claim_with_relayer(&1, &t.recipient, &t.relayer);
 
     let pkg = t.client.get_package(&1);
     assert_eq!(pkg.status, PackageStatus::Claimed);
@@ -117,8 +129,7 @@ fn relayed_claim_emits_separate_event() {
     let t = RelayerTest::new();
     t.create_package(1);
 
-    t.client
-        .claim_with_relayer(&1, &t.recipient, &t.relayer);
+    t.client.claim_with_relayer(&1, &t.recipient, &t.relayer);
 
     let pkg = t.client.get_package(&1);
     assert_eq!(pkg.status, PackageStatus::Claimed);
@@ -129,8 +140,7 @@ fn relayed_claim_fails_on_replay() {
     let t = RelayerTest::new();
     t.create_package(1);
 
-    t.client
-        .claim_with_relayer(&1, &t.recipient, &t.relayer);
+    t.client.claim_with_relayer(&1, &t.recipient, &t.relayer);
 
     let result = t
         .client
@@ -143,9 +153,7 @@ fn relayed_claim_fails_for_stranger() {
     let t = RelayerTest::new();
     t.create_package(1);
 
-    let result = t
-        .client
-        .try_claim_with_relayer(&1, &t.stranger, &t.relayer);
+    let result = t.client.try_claim_with_relayer(&1, &t.stranger, &t.relayer);
     assert_eq!(result, Err(Ok(Error::NotAuthorized)));
 
     let pkg = t.client.get_package(&1);
@@ -214,9 +222,7 @@ fn relayed_claim_fails_for_merkle_protected_package() {
         &metadata,
     );
 
-    let result = t
-        .client
-        .try_claim_with_relayer(&42, &claimant, &t.relayer);
+    let result = t.client.try_claim_with_relayer(&42, &claimant, &t.relayer);
     assert_eq!(result, Err(Ok(Error::InvalidProof)));
 }
 
@@ -240,8 +246,7 @@ fn relayed_claim_via_delegate_succeeds() {
 
     t.client.set_delegate(&t.admin, &1, &t.delegate);
 
-    t.client
-        .claim_with_relayer(&1, &t.delegate, &t.relayer);
+    t.client.claim_with_relayer(&1, &t.delegate, &t.relayer);
 
     let pkg = t.client.get_package(&1);
     assert_eq!(pkg.status, PackageStatus::Claimed);
@@ -259,9 +264,7 @@ fn relayed_claim_via_expired_delegate_fails() {
 
     t.advance_time(101);
 
-    let result = t
-        .client
-        .try_claim_with_relayer(&1, &t.delegate, &t.relayer);
+    let result = t.client.try_claim_with_relayer(&1, &t.delegate, &t.relayer);
     assert_eq!(result, Err(Ok(Error::NotAuthorized)));
 
     let pkg = t.client.get_package(&1);
