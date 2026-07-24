@@ -302,6 +302,7 @@ pub fn is_authorised_claimer(
 }
 
 /// Returns detailed authorization information for debugging/auditing.
+#[cfg(test)]
 pub fn get_authorization_info(
     env: &Env,
     package_id: u64,
